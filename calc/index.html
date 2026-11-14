@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Калькулятор T2-билдов</title>
+<meta name="description" content="Калькулятор характеристик Throne and Liberty: посох + кинжалы и посох + лук, T2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23a8792a'/%3E%3Ctext x='16' y='22' font-size='14' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3ET2%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">T2</span><div><b>Калькулятор билдов</b><small>Throne and Liberty · посох + кинжалы / лук</small></div></div>
+  <nav class="topnav">
+    <a href="../">← Пресеты для tl-build.ru</a>
+    <button id="themeBtn" class="ghost" title="Тема">◐</button>
+  </nav>
+</header>
+
+<main class="layout">
+  <section class="col-left">
+    <div class="panel">
+      <div class="panel-h"><h2>Сборка</h2>
+        <div class="row-actions">
+          <select id="presetSel"><option value="">Пресеты…</option></select>
+          <button id="newBtn" class="ghost">Очистить</button>
+        </div>
+      </div>
+      <div class="combo">
+        <label>Связка оружия
+          <select id="comboSel"><option value="Dagger">Посох + Кинжалы</option><option value="Bow">Посох + Лук</option></select>
+        </label>
+        <label>Название <input id="buildName" placeholder="Мой билд" maxlength="40"></label>
+      </div>
+      <div id="slots" class="slots"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h2>Характеристики</h2><span id="pointsLeft" class="pill"></span></div>
+      <div id="attrs" class="attrs"></div>
+      <p class="hint">Уровень 55 · 54 очка. Стоимость очка растёт: до 30 — 1, до 40 — 2, до 50 — 4, до 60 — 8, до 70 — 16.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h2>Доп. бонусы</h2><button id="addBonus" class="ghost">+ Добавить</button></div>
+      <p class="hint">Руны, артефакты, мастерство, серьга, баффы — всё, чего нет в базе предметов. Значения вписывайте как в игре (например, «Уклонение (ближний бой) 72»).</p>
+      <div id="bonuses" class="bonuses"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h2>Мои билды</h2>
+        <div class="row-actions"><button id="saveBtn">Сохранить</button><button id="shareBtn" class="ghost">Ссылка</button></div>
+      </div>
+      <div id="saved" class="saved"></div>
+    </div>
+  </section>
+
+  <aside class="col-right">
+    <div class="panel sticky">
+      <div class="panel-h"><h2>Итог</h2><span class="pill" id="gs"></span></div>
+      <div id="summary"></div>
+      <details class="all"><summary>Все характеристики</summary><div id="allStats"></div></details>
+      <details class="all"><summary>Активные бонусы сетов</summary><div id="setInfo"></div></details>
+    </div>
+  </aside>
+</main>
+
+<dialog id="picker">
+  <form method="dialog" class="dlg">
+    <div class="dlg-h"><h3 id="pickTitle">Выбор предмета</h3><button value="cancel" class="ghost x">×</button></div>
+    <input id="pickSearch" placeholder="Поиск по названию или стату (например, уклонение)">
+    <div id="pickList" class="pick-list"></div>
+  </form>
+</dialog>
+
+<dialog id="editor">
+  <form method="dialog" class="dlg">
+    <div class="dlg-h"><h3 id="edTitle"></h3><button value="cancel" class="ghost x">×</button></div>
+    <div id="edBody"></div>
+    <div class="dlg-f"><button value="remove" class="ghost danger" id="edRemove">Снять</button><button value="change" class="ghost" id="edChange">Сменить предмет</button><button value="ok">Готово</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+<footer class="foot">
+  Предметы, трейты и резонанс — база <a href="https://build.tlwg.ru" target="_blank" rel="noopener">build.tlwg.ru</a>.
+  Таблицы характеристик — <a href="https://sidorov-ka.github.io/fury-stat-lab/" target="_blank" rel="noopener">Fury Lab</a> (с разрешения автора).
+  Калькулятор считает снаряжение, трейты, резонанс, сеты и характеристики; руны, артефакты и мастерство добавляются вручную. Цифры могут отличаться от других конструкторов из-за разных баз.
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
