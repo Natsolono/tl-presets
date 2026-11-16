@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Каталог билдов</title>
+<meta name="description" content="Каталог T2-билдов Throne and Liberty: все классы, снаряжение с заточкой и трейтами, умения со специализациями, руны, артефакты, мастерство">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23a8792a'/%3E%3Ctext x='16' y='22' font-size='14' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3ET2%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../calc/style.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><span class="logo">T2</span><div><b>Каталог билдов</b><small>Throne and Liberty · все классы</small></div></a>
+  <nav class="topnav">
+    <a href="../">Пресеты</a>
+    <a href="../calc/">Калькулятор</a>
+    <button id="themeBtn" class="ghost" title="Сменить тему" aria-label="Сменить тему">◐</button>
+  </nav>
+</header>
+
+<main id="listView" class="wrap">
+  <section class="filters panel" aria-label="Фильтры">
+    <div class="f-row">
+      <input id="q" type="search" placeholder="Поиск по названию или автору" autocomplete="off" aria-label="Поиск">
+      <select id="sort" aria-label="Сортировка">
+        <option value="top">Сначала лучшие</option>
+        <option value="views">Самые просматриваемые</option>
+        <option value="new">Сначала новые</option>
+        <option value="rating">По оценке</option>
+      </select>
+    </div>
+    <div class="f-block">
+      <span class="f-lbl">Оружие <small>— до двух, покажу билды с этим оружием</small></span>
+      <div id="weapons" class="chips"></div>
+    </div>
+    <div class="f-row f-row-wrap">
+      <div class="f-block"><span class="f-lbl">Роль</span><div id="role" class="seg"></div></div>
+      <div class="f-block"><span class="f-lbl">Режим</span><div id="mode" class="seg"></div></div>
+      <label class="chk"><input id="calcOnly" type="checkbox"> Открывается в калькуляторе</label>
+    </div>
+    <div class="f-foot"><span id="count" class="pill"></span><button id="reset" class="ghost" type="button">Сбросить фильтры</button></div>
+  </section>
+  <section id="grid" class="grid" aria-live="polite"></section>
+  <div class="more"><button id="moreBtn" class="ghost" type="button" hidden>Показать ещё</button></div>
+</main>
+
+<main id="buildView" class="wrap" hidden></main>
+
+<footer class="foot">
+  Билды собраны с <a href="https://tl-build.ru" target="_blank" rel="noopener">tl-build.ru</a> — у каждого указан автор и ссылка на оригинал.
+  Названия, иконки предметов и умений — база <a href="https://build.tlwg.ru" target="_blank" rel="noopener">build.tlwg.ru</a>.
+  <span id="built"></span>
+</footer>
+<div id="toast" class="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
