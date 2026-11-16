@@ -155,3 +155,10 @@
 /* тело карточки: колонка, мета прижата к низу, бейджи не растягиваются */
 .c-body{display:flex;flex-direction:column;gap:6px}
 .badges{align-items:flex-start}
+/* артефакты с иконками, мастерство с названиями */
+.art .it{grid-template-columns:44px minmax(0,1fr)}
+.ms-nodes li>span:first-child{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.ms-common{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+.ms-common li{font-size:13px}.ms-common p{margin:4px 0 0;color:var(--mute);line-height:1.5}
+.mc-h{display:flex;align-items:center;gap:8px}
+.giscus{min-height:120px}

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Энциклопедия предметов и умений</title>
+<meta name="description" content="База Throne and Liberty: оружие, броня и бижутерия с заточкой, трейтами, резонансом, сетами и источниками; умения всех классов по уровням со специализациями">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2386601A'/%3E%3Ctext x='16' y='22' font-size='14' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3ET2%3C/text%3E%3C/svg%3E">
+<script src="../assets/theme.js"></script>
+<link rel="stylesheet" href="../assets/ui.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip btn primary" href="#main">Перейти к содержимому</a>
+<header class="site-top"><div class="in">
+  <a class="site-brand" href="../"><span class="site-logo" aria-hidden="true">T2</span><span>T2 Билды<small>Throne and Liberty</small></span></a>
+  <form class="site-search" action="../builds/" method="get" role="search"><label class="sr-only" for="siteQ">Поиск билдов по названию, автору или классу</label><input id="siteQ" name="q" type="search" placeholder="Найти билд…" autocomplete="off"></form>
+  <nav class="site-nav" aria-label="Разделы сайта"><a href="../builds/">Каталог билдов</a><a href="../calc/">Конструктор</a><a href="./" aria-current="page">Энциклопедия</a><a href="../">Пресеты</a></nav>
+  <div data-theme-switch></div>
+</div></header>
+
+<main id="main" class="wrap" tabindex="-1">
+  <div class="page-h0">
+    <h1>Энциклопедия</h1>
+    <p>Предметы и умения Throne and Liberty: статы с заточкой, трейты, сеты, источники, умения по уровням и специализации.</p>
+  </div>
+  <div class="tabs-main" role="tablist" aria-label="Раздел энциклопедии">
+    <a role="tab" id="tabItems" href="#items" aria-selected="true">Предметы</a>
+    <a role="tab" id="tabSkills" href="#skills" aria-selected="false">Умения</a>
+  </div>
+
+  <section id="itemsView" aria-labelledby="tabItems">
+    <div class="filters panel">
+      <div class="f-row">
+        <div class="f-block"><label class="f-lbl" for="iq">Поиск</label><input id="iq" type="search" placeholder="Название, стат или сет — например, «уклонение»" autocomplete="off"></div>
+        <div class="f-block"><label class="f-lbl" for="isort">Сортировка</label>
+          <select id="isort"><option value="gs">По GS (выше — лучше)</option><option value="name">По названию</option><option value="grade">По редкости</option><option value="lvl">По уровню</option></select></div>
+      </div>
+      <div class="f-block" role="group" aria-labelledby="slotLbl"><span class="f-lbl" id="slotLbl">Тип</span><div id="islot" class="chips"></div></div>
+      <div class="f-row f-row-3">
+        <div class="f-block"><label class="f-lbl" for="igrade">Редкость</label><select id="igrade"><option value="">Любая</option></select></div>
+        <div class="f-block"><label class="f-lbl" for="itier">Тир</label><select id="itier"><option value="">Любой</option><option value="t1">T1</option><option value="t2">T2</option><option value="t3">T3</option></select></div>
+        <div class="f-block"><label class="f-lbl" for="isrc">Где добыть</label><select id="isrc"><option value="">Любой источник</option></select></div>
+      </div>
+      <div class="f-foot"><span id="icount" class="pill" role="status" aria-live="polite"></span><button id="ireset" class="text" type="button">Сбросить фильтры</button></div>
+    </div>
+    <h2 class="sr-only">Предметы</h2>
+    <ul id="ilist" class="rows"></ul>
+    <div class="more"><button id="imore" class="ghost" type="button" hidden>Показать ещё</button></div>
+  </section>
+
+  <section id="skillsView" aria-labelledby="tabSkills" hidden>
+    <div class="filters panel">
+      <div class="f-row">
+        <div class="f-block"><label class="f-lbl" for="sq">Поиск</label><input id="sq" type="search" placeholder="Название или текст — например, «оглушение»" autocomplete="off"></div>
+        <div class="f-block"><label class="f-lbl" for="stype">Тип умения</label><select id="stype"><option value="">Все</option><option value="Active">Активные</option><option value="Passive">Пассивные</option></select></div>
+      </div>
+      <div class="f-block" role="group" aria-labelledby="swLbl"><span class="f-lbl" id="swLbl">Оружие</span><div id="sweap" class="chips"></div></div>
+      <div class="f-foot"><span id="scount" class="pill" role="status" aria-live="polite"></span><button id="sreset" class="text" type="button">Сбросить фильтры</button></div>
+    </div>
+    <h2 class="sr-only">Умения</h2>
+    <ul id="slist" class="rows"></ul>
+  </section>
+</main>
+
+<dialog id="card" class="card-dlg" aria-labelledby="cardTitle">
+  <div class="dlg-h"><h2 id="cardTitle"></h2><button type="button" class="ghost x" id="cardClose" aria-label="Закрыть">×</button></div>
+  <div id="cardBody" class="card-body"></div>
+  <div class="dlg-f"><button type="button" class="ghost" id="cardShare">🔗 Скопировать ссылку</button><button type="button" id="cardOk">Закрыть</button></div>
+</dialog>
+
+<footer class="site-foot">
+  Данные предметов и умений — <a href="https://tl-build.ru" target="_blank" rel="noopener">tl-build.ru</a> и <a href="https://build.tlwg.ru" target="_blank" rel="noopener">build.tlwg.ru</a> (используются с разрешения). Источники получения — build.tlwg.ru.
+  <span id="built"></span>
+</footer>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="../assets/common.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -15,7 +15,7 @@
   --acc-ink:#FFFFFF;      /* текст на акцентной кнопке */
   --acc-soft:color-mix(in srgb,var(--acc) 12%,transparent);
   --good:#15803D; --bad:#B91C1C; --info:#1D4ED8;
-  --g-Epic:#7C3AED; --g-Legendary:#92570A; --g-Rare2:#1D4ED8; --g-Rare:#1D4ED8;
+  --g-Epic:#7C3AED; --g-Epic2:#6D28D9; --g-Legendary:#92570A; --g-Rare2:#1D4ED8; --g-Rare:#1D4ED8;
   --focus:color-mix(in srgb,var(--acc) 55%,transparent);
   --shadow:0 1px 2px rgb(17 24 39 / .06),0 4px 14px rgb(17 24 39 / .06);
   --shadow-lg:0 10px 30px rgb(17 24 39 / .12);
@@ -37,7 +37,7 @@
   --ink:#E8EAED; --mute:#A1A7B3;
   --acc:#D6A94A; --acc-ink:#0F1115;
   --good:#4ADE80; --bad:#F87171; --info:#7DA2F0;
-  --g-Epic:#B794F6; --g-Legendary:#E5B04A; --g-Rare2:#7DA2F0; --g-Rare:#7DA2F0;
+  --g-Epic:#B794F6; --g-Epic2:#C4A5F8; --g-Legendary:#E5B04A; --g-Rare2:#7DA2F0; --g-Rare:#7DA2F0;
   --shadow:0 1px 2px rgb(0 0 0 / .3),0 4px 14px rgb(0 0 0 / .25);
   --shadow-lg:0 10px 30px rgb(0 0 0 / .45);
   --overlay:rgb(0 0 0 / .6);
@@ -49,7 +49,7 @@
   --bg:#0F1115; --surface:#181B21; --surface-2:#20242C; --line:#2A2F38; --line-strong:#3A414D;
   --ink:#E8EAED; --mute:#A1A7B3; --acc:#D6A94A; --acc-ink:#0F1115;
   --good:#4ADE80; --bad:#F87171; --info:#7DA2F0;
-  --g-Epic:#B794F6; --g-Legendary:#E5B04A; --g-Rare2:#7DA2F0; --g-Rare:#7DA2F0;
+  --g-Epic:#B794F6; --g-Epic2:#C4A5F8; --g-Legendary:#E5B04A; --g-Rare2:#7DA2F0; --g-Rare:#7DA2F0;
   --overlay:rgb(0 0 0 / .6); --img-dim:brightness(.88) contrast(1.02);
 }}
 
@@ -156,3 +156,5 @@ dialog::backdrop{background:var(--overlay);animation:ui-fade var(--t)}
 
 /* ---------- подвал ---------- */
 .site-foot{max-width:var(--maxw);margin:0 auto;padding:var(--s5) var(--s4) var(--s6);color:var(--mute);font-size:13px;border-top:1px solid var(--line)}
+
+.g-Epic{color:var(--g-Epic)}.g-Epic2{color:var(--g-Epic2)}.g-Legendary,.g-Heroic{color:var(--g-Legendary)}.g-Rare2,.g-Rare{color:var(--g-Rare2)}

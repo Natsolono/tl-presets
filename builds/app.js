@@ -24,7 +24,7 @@ const RUNE_RU = { Attack: 'атаки', Defense: 'защиты', All: 'унив�
 const PAGE = 48;
 
 let CAT = [], D = null, view = [], shown = 0;
-const F = Object.assign({ q: '', w: [], role: '', mode: '', sort: 'top', calc: false }, store.get('tlb-filters', {}));
+const F = Object.assign({ q: '', w: [], role: '', mode: '', sort: 'top' }, store.get('tlb-filters', {})); delete F.calc;
 
 /* ---------- форматирование ---------- */
 const nf = n => Number(n || 0).toLocaleString('ru-RU');
@@ -39,7 +39,7 @@ function fmtVal(k, raw) {
 }
 function icon(name, alt, small) {
   if (!name) { const s = el('span', 'ic miss' + (small ? ' sm' : ''), '?'); s.setAttribute('aria-hidden', 'true'); return s; }
-  const i = el('img', 'ic' + (small ? ' sm' : '')); i.loading = 'lazy'; i.alt = alt || ''; i.src = 'ic/' + name;
+  const i = el('img', 'ic' + (small ? ' sm' : '')); i.loading = 'lazy'; i.alt = alt || ''; i.src = '../data/ic/' + name;
   i.onerror = () => { const s = el('span', 'ic miss' + (small ? ' sm' : ''), '?'); i.replaceWith(s); };
   return i;
 }
@@ -64,12 +64,11 @@ function filtersUI() {
   seg($('#role'), ROLES, 'role'); seg($('#mode'), MODES, 'mode');
   let qt; $('#q').oninput = e => { clearTimeout(qt); qt = setTimeout(() => { F.q = e.target.value; apply(); }, 150); };
   $('#sort').onchange = e => { F.sort = e.target.value; apply(); };
-  $('#calcOnly').onchange = e => { F.calc = e.target.checked; apply(); };
-  $('#reset').onclick = () => { Object.assign(F, { q: '', w: [], role: '', mode: '', sort: 'top', calc: false }); apply(); };
+  $('#reset').onclick = () => { Object.assign(F, { q: '', w: [], role: '', mode: '', sort: 'top' }); apply(); };
   $('#moreBtn').onclick = () => renderMore();
 }
 function syncUI() {
-  $('#q').value = F.q; $('#sort').value = F.sort; $('#calcOnly').checked = F.calc;
+  $('#q').value = F.q; $('#sort').value = F.sort;
   document.querySelectorAll('#weapons .chip').forEach(b => { const on = F.w.includes(b.dataset.w); b.setAttribute('aria-pressed', on); b.disabled = !on && F.w.length >= 2; });
   document.querySelectorAll('#role button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === F.role));
   document.querySelectorAll('#mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === F.mode));
@@ -78,7 +77,7 @@ function apply() {
   store.set('tlb-filters', F); syncUI();
   const q = F.q.trim().toLowerCase();
   view = CAT.filter(b => (!q || b.n.toLowerCase().includes(q) || b.a.toLowerCase().includes(q) || b.cls.includes(q))
-    && F.w.every(w => b.w.includes(w)) && (!F.role || b.role === F.role) && (!F.mode || b.mode === F.mode) && (!F.calc || b.calc));
+    && F.w.every(w => b.w.includes(w)) && (!F.role || b.role === F.role) && (!F.mode || b.mode === F.mode));
   const by = { top: (a, b) => b.score - a.score || b.v - a.v, views: (a, b) => b.v - a.v, new: (a, b) => (b.d || '').localeCompare(a.d || '') || b.id - a.id, rating: (a, b) => b.rt - a.rt || b.rc - a.rc };
   view.sort(by[F.sort] || by.top);
   $('#count').textContent = view.length ? `Найдено: ${nf(view.length)}` : 'Ничего не найдено'; $('#siteQ').value = F.q;
@@ -95,7 +94,6 @@ function card(b) {
   if (b.role) bd.append(el('span', 'bdg r-' + b.role, ROLE_RU[b.role] || b.role));
   if (b.mode) bd.append(el('span', 'bdg', MODE_RU[b.mode] || b.mode));
   if (b.lo > 1) bd.append(el('span', 'bdg', b.lo + ' варианта'));
-  if (b.calc) bd.append(el('span', 'bdg calc', 'калькулятор'));
   body.append(bd);
   const m = el('div', 'c-meta');
   const s1 = el('span'); s1.append('★ ', el('b', null, b.rt ? b.rt.toFixed(1) : '—'), b.rc ? ` (${b.rc})` : ''); m.append(s1);
@@ -180,9 +178,10 @@ function renderLoadout(box, b, lo) {
   if (lo.art && lo.art.length) {
     const s5 = section('Артефакты'); const ag = el('div', 'art');
     lo.art.forEach(([slot, id, stats]) => {
-      const c = el('div', 'it'); const m = String(id).match(/_set_(\d+)_(\d+)$/);
-      const kind = /^gem/.test(slot) ? 'Самоцвет' : 'Талисман';
-      const info = el('div'); info.append(el('div', 'sl', kind + ' ' + (slot.match(/\d+$/) || [''])[0]), el('div', 'nm', m ? `Набор ${+m[1]}, предмет ${+m[2]}` : id));
+      const a = (D.arts || {})[id] || {}; const c = el('div', 'it');
+      const kind = /^gem/.test(slot) ? 'Самоцвет' : 'Талирит';
+      c.append(icon(a.ic, a.n));
+      const info = el('div'); info.append(el('div', 'sl', kind + ' ' + (slot.match(/\d+$/) || [''])[0]), el('div', 'nm ' + (a.g ? 'g-' + a.g : ''), a.n || id));
       c.append(info);
       if (stats.length) { const ul = el('ul'); stats.forEach(([k, v]) => { const li = el('li'); li.append(el('span', null, lab(k)), el('span', null, fmtVal(k, v))); ul.append(li); }); c.append(ul); }
       ag.append(c);
@@ -193,17 +192,20 @@ function renderLoadout(box, b, lo) {
   const wl = Object.entries(lo.msw || {}); const nodes = Object.entries(lo.ms || {});
   if (wl.length || nodes.length || lo.msl) {
     const s6 = section('Мастерство', lo.msl ? el('span', 'pill', 'уровень ' + lo.msl) : null);
-    if (wl.length) { const w = el('div', 'ms-w'); wl.forEach(([k, v]) => w.append(el('span', 'bdg', `${MS_W[k] || k}: ${v}`))); s6.append(w); }
+    if (wl.length) { const w = el('div', 'ms-w'); wl.forEach(([k, v]) => w.append(el('span', 'bdg', `${(D.mw || {})[k] || MS_W[k] || k}: ${v}`))); s6.append(w); }
     nodes.forEach(([wk, list]) => {
       const det = el('details', 'all'); const n = Object.keys(list).length;
-      det.append(el('summary', null, `${MS_W[wk] || wk}: узлов ${n}`));
+      det.append(el('summary', null, `${(D.mw || {})[wk] || MS_W[wk] || wk}: узлов ${n}`));
       const ul = el('ul', 'ms-nodes');
-      Object.entries(list).forEach(([id, v]) => { const li = el('li'); li.append(el('span', null, msNode(id)), el('span', 'muted', 'ур. ' + v)); ul.append(li); });
+      Object.entries(list).forEach(([id, v]) => { const m = (D.ms || {})[id]; const li = el('li'); const nm = el('span'); nm.append(icon(m && m.ic, '', true), document.createTextNode(m ? m.n : msNode(id))); if (m && m.cat) nm.title = m.cat; li.append(nm, el('span', 'muted', 'ур. ' + v)); ul.append(li); });
       det.append(ul); s6.append(det);
     });
     const common = (lo.msc || []).filter(Boolean);
-    if (common.length) s6.append(el('p', 'hint', 'Общие умения мастерства: ' + common.map(x => '№' + (+(x.match(/\d+$/) || [0])[0])).join(', ')));
-    s6.append(el('p', 'hint', 'Названий узлов мастерства нет в открытых базах, поэтому показан тип и номер узла.'));
+    if (common.length) {
+      const det = el('details', 'all'); det.append(el('summary', null, `Общие умения мастерства: ${common.length}`));
+      const ul = el('ul', 'ms-common'); common.forEach(x => { const c = (D.msc || {})[x] || {}; const li = el('li'); const h = el('div', 'mc-h'); h.append(icon(c.ic, '', true), el('b', null, c.n || x)); li.append(h); if (c.t) li.append(el('p', null, c.t)); ul.append(li); });
+      det.append(ul); s6.append(det);
+    }
     right.append(s6);
   }
   g.append(left, right); box.append(g);
@@ -232,10 +234,10 @@ async function showBuild(id, loIdx) {
   sr.append(box('Оценка', b.rt ? `★ ${b.rt.toFixed(1)}` : '—'), box('Голосов', nf(b.rc)), box('Просмотров', nf(b.v)), box('Вариантов', b.los.length));
   l.append(sr);
   const act = el('div', 'actions');
-  const calcBtn = el('a', 'btn primary', '🧮 Открыть в калькуляторе'); calcBtn.hidden = true;
+  const calcBtn = el('a', 'btn primary', '🧮 Открыть в конструкторе'); calcBtn.hidden = true;
   const orig = el('a', 'btn', 'Оригинал на tl-build.ru ↗'); orig.href = b.url; orig.target = '_blank'; orig.rel = 'noopener';
   const share = el('button', 'ghost', '🔗 Скопировать ссылку'); share.type = 'button';
-  share.onclick = () => { const u = location.href; navigator.clipboard.writeText(u).then(() => toast('Ссылка скопирована'), () => prompt('Ссылка на билд:', u)); };
+  share.onclick = () => { const u = b.u ? new URL('../' + b.u, location.href).href : location.href; navigator.clipboard.writeText(u).then(() => toast('Ссылка скопирована'), () => prompt('Ссылка на билд:', u)); };
   act.append(calcBtn, orig, share); l.append(act);
   let r;
   if (b.img) {
@@ -259,6 +261,7 @@ async function showBuild(id, loIdx) {
     v.append(tabs);
   }
   v.append(body); pick(Math.min(loIdx || 0, b.los.length - 1));
+  v.append(comments(b));
   h1.focus({ preventScroll: true });
 }
 /* ---------- просмотр картинок в полный размер ---------- */
@@ -287,6 +290,25 @@ function viewerUI() {
   d.addEventListener('click', e => { if (e.target === d) d.close(); });
   d.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') openViewer(gi - 1); if (e.key === 'ArrowRight') openViewer(gi + 1); });
 }
+/* ---------- комментарии: Giscus (обсуждения GitHub, вход через аккаунт GitHub) ---------- */
+const GISCUS = { repo: 'Natsolono/tl-presets', repoId: '__REPO_ID__', category: 'Комментарии к билдам', categoryId: '__CATEGORY_ID__' };
+const giscusTheme = () => document.documentElement.dataset.theme === 'dark' ? 'dark_dimmed' : 'light';
+function comments(b) {
+  const sec = section('Обсуждение'); const box = el('div', 'giscus');
+  if (GISCUS.repoId.startsWith('__')) { sec.append(el('p', 'hint', 'Комментарии скоро появятся.')); return sec; }
+  sec.append(el('p', 'hint', 'Отзывы и вопросы автору. Чтобы написать, войдите через аккаунт GitHub. Поддерживается форматирование Markdown.'), box);
+  const load = () => {
+    const sc = document.createElement('script'); sc.src = 'https://giscus.app/client.js'; sc.async = true; sc.crossOrigin = 'anonymous';
+    Object.entries({ 'data-repo': GISCUS.repo, 'data-repo-id': GISCUS.repoId, 'data-category': GISCUS.category, 'data-category-id': GISCUS.categoryId,
+      'data-mapping': 'specific', 'data-term': 'Билд ' + b.id + ': ' + (b.n || ''), 'data-strict': '1', 'data-reactions-enabled': '1', 'data-emit-metadata': '0',
+      'data-input-position': 'top', 'data-theme': giscusTheme(), 'data-lang': 'ru', 'data-loading': 'lazy' }).forEach(([k, v]) => sc.setAttribute(k, v));
+    box.append(sc);
+  };
+  if ('IntersectionObserver' in window) { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); load(); } }, { rootMargin: '400px' }); io.observe(sec); } else load();
+  return sec;
+}
+new MutationObserver(() => { const f = document.querySelector('iframe.giscus-frame'); if (f) f.contentWindow.postMessage({ giscus: { setConfig: { theme: giscusTheme() } } }, 'https://giscus.app'); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 function backBtn() { const a = el('a', 'btn back', '← Все билды'); a.href = '#'; return a; }
 function route() {
   const m = location.hash.match(/^#(\d+)(?:\/(\d+))?/);
@@ -299,7 +321,7 @@ function route() {
 
 async function init() {
   const qp = new URLSearchParams(location.search).get('q');
-  if (qp != null) { Object.assign(F, { q: qp, w: [], role: '', mode: '', calc: false }); history.replaceState(null, '', location.pathname + location.hash); }
+  if (qp != null) { Object.assign(F, { q: qp, w: [], role: '', mode: '' }); history.replaceState(null, '', location.pathname + location.hash); }
   $('.site-search').addEventListener('submit', e => { e.preventDefault(); F.q = $('#siteQ').value; if (location.hash) location.hash = ''; apply(); $('#grid').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   filtersUI(); viewerUI();
   const c = await (await fetch('catalog.json')).json();
