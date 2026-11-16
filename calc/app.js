@@ -150,8 +150,8 @@ function renderAttrs(R) {
     const t = el('div', 't'); t.append(el('span', null, ru), el('span', null, 'ещё ' + nextCost(B.attr[key]) + ' оч.'));
     const v = el('div', 'v'); v.textContent = R.tot[key]; const sm = el('small', null, ` (${B.attr[key]} + ${R.tot[key] - B.attr[key]})`); v.append(sm);
     const ctl = el('div', 'ctl');
-    const minus = el('button', 'ghost', '−'); minus.type = 'button'; minus.onclick = () => { if (B.attr[key] > 10) { B.attr[key]--; update(); } };
-    const plus = el('button', 'ghost', '+'); plus.type = 'button'; plus.onclick = () => { const c = compute(B); if (c.pts + nextCost(B.attr[key]) <= POINTS) { B.attr[key]++; update(); } else toast('Не хватает очков'); };
+    const minus = el('button', 'ghost', '−'); minus.type = 'button'; minus.setAttribute('aria-label', 'Убавить: ' + ru); minus.onclick = () => { if (B.attr[key] > 10) { B.attr[key]--; update(); } };
+    const plus = el('button', 'ghost', '+'); plus.type = 'button'; plus.setAttribute('aria-label', 'Прибавить: ' + ru); plus.onclick = () => { const c = compute(B); if (c.pts + nextCost(B.attr[key]) <= POINTS) { B.attr[key]++; update(); } else toast('Не хватает очков'); };
     ctl.append(minus, plus); card.append(t, v, ctl); box.append(card);
   }
   const left = POINTS - R.pts; const p = $('#pointsLeft'); p.textContent = `осталось ${left} / ${POINTS}`; p.classList.toggle('bad', left < 0);
@@ -161,14 +161,14 @@ function renderBonuses() {
   const box = $('#bonuses'); box.innerHTML = '';
   B.bonus.forEach((r, i) => {
     const row = el('div', 'bonus');
-    const src = el('select'); BONUS_SOURCES.forEach(x => { const o = el('option', null, x); o.value = x; src.append(o); }); src.value = r.src || 'Руна';
+    const src = el('select'); src.setAttribute('aria-label', 'Источник бонуса'); BONUS_SOURCES.forEach(x => { const o = el('option', null, x); o.value = x; src.append(o); }); src.value = r.src || 'Руна';
     src.onchange = () => { r.src = src.value; save(); };
-    const st = el('select', 'stat'); const o0 = el('option', null, 'Стат…'); o0.value = ''; st.append(o0);
+    const st = el('select', 'stat'); st.setAttribute('aria-label', 'Характеристика'); const o0 = el('option', null, 'Стат…'); o0.value = ''; st.append(o0);
     STAT_KEYS.forEach(k => { const o = el('option', null, lab(k)); o.value = k; st.append(o); }); st.value = r.stat || '';
     st.onchange = () => { r.stat = st.value; update(); };
-    const v = el('input'); v.type = 'number'; v.step = 'any'; v.value = r.val ?? ''; v.placeholder = 'значение';
+    const v = el('input'); v.type = 'number'; v.step = 'any'; v.value = r.val ?? ''; v.placeholder = 'значение'; v.setAttribute('aria-label', 'Значение бонуса');
     v.oninput = () => { r.val = v.value; update(false); };
-    const del = el('button', 'ghost danger', '×'); del.type = 'button'; del.onclick = () => { B.bonus.splice(i, 1); update(); };
+    const del = el('button', 'ghost danger', '×'); del.type = 'button'; del.setAttribute('aria-label', 'Удалить бонус'); del.onclick = () => { B.bonus.splice(i, 1); update(); };
     row.append(src, st, v, del); box.append(row);
   });
 }
@@ -245,7 +245,7 @@ function openEarring() {
   edSlot = 'earring'; $('#edTitle').textContent = 'Серьга'; $('#edTitle').className = '';
   const body = $('#edBody'); body.innerHTML = '';
   body.append(el('p', 'hint', 'Серёг нет в базе предметов build.tlwg.ru. Впишите статы серьги в «Доп. бонусах» (источник «Серьга»), а здесь укажите, к какому комплекту она относится — тогда она засчитается в бонус сета.'));
-  const sel = el('select'); const o0 = el('option', null, 'Без комплекта'); o0.value = ''; sel.append(o0);
+  const sel = el('select'); sel.setAttribute('aria-label', 'Комплект серьги'); const o0 = el('option', null, 'Без комплекта'); o0.value = ''; sel.append(o0);
   D.jsets.forEach(n => { const o = el('option', null, n.replace(/^Комплект /, '')); o.value = n; sel.append(o); });
   sel.value = B.earSet || ''; sel.onchange = () => { B.earSet = sel.value || null; update(false); };
   body.append(sel);
@@ -258,7 +258,7 @@ function openEditor(slot) {
   $('#edTitle').textContent = it.n; $('#edTitle').className = 'g-' + it.g;
   const body = $('#edBody'); body.innerHTML = '';
   const sec1 = el('div', 'ed-sec'); sec1.append(el('h4', null, 'Заточка'));
-  const r1 = el('div', 'ed-row'); const rng = el('input'); rng.type = 'range'; rng.min = 0; rng.max = it.mx; rng.value = e.ench ?? it.mx;
+  const r1 = el('div', 'ed-row'); const rng = el('input'); rng.type = 'range'; rng.setAttribute('aria-label', 'Заточка'); rng.min = 0; rng.max = it.mx; rng.value = e.ench ?? it.mx;
   const out = el('b', null, '+' + rng.value); rng.oninput = () => { e.ench = +rng.value; out.textContent = '+' + rng.value; update(false); };
   r1.append(rng, out); sec1.append(r1);
   const base = el('div', 'ed-stats'); const lv = String(e.ench ?? it.mx);
@@ -270,7 +270,7 @@ function openEditor(slot) {
       const d = D.traits[t]; const cur = (e.traits || []).find(x => x.id === t);
       const row = el('div', 'ed-row'); const lb = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = !!cur;
       lb.append(cb, document.createTextNode(' ' + lab(d.s)));
-      const lvl = el('select'); const n = Math.min(4, (d.c || []).length || 1);
+      const lvl = el('select'); lvl.setAttribute('aria-label', 'Уровень трейта'); const n = Math.min(4, (d.c || []).length || 1);
       for (let i = 1; i <= n; i++) { const o = el('option', null, `ур. ${i} · ${fmtVal(d.s, traitValue(t, i))}`); o.value = i; lvl.append(o); }
       lvl.value = cur ? cur.lvl : n;
       cb.onchange = () => {
@@ -286,7 +286,7 @@ function openEditor(slot) {
   }
   if (it.res.length) {
     const sec = el('div', 'ed-sec'); sec.append(el('h4', null, 'Резонанс'));
-    const sel = el('select'); const o0 = el('option', null, 'Не открыт'); o0.value = ''; sel.append(o0);
+    const sel = el('select'); sel.setAttribute('aria-label', 'Резонанс'); const o0 = el('option', null, 'Не открыт'); o0.value = ''; sel.append(o0);
     it.res.forEach((r, i) => { const o = el('option', null, Object.entries(r).map(([k, v]) => lab(k) + ' ' + fmtVal(k, v)).join(', ')); o.value = i; sel.append(o); });
     sel.value = e.res ?? ''; sel.onchange = () => { e.res = sel.value === '' ? null : +sel.value; update(false); };
     sec.append(sel); body.append(sec);
@@ -334,8 +334,6 @@ function renderSaved() {
 }
 
 async function init() {
-  const theme = store.get('t2calc-theme', null); if (theme) document.documentElement.dataset.theme = theme;
-  $('#themeBtn').onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); const nx = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = nx; store.set('t2calc-theme', nx); };
   D = await (await fetch('data.json')).json();
   D.items.forEach(it => byId.set(it.id, it));
   STAT_KEYS = Object.keys(D.labels)

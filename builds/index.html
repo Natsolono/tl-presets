@@ -5,54 +5,74 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Каталог билдов</title>
 <meta name="description" content="Каталог T2-билдов Throne and Liberty: все классы, снаряжение с заточкой и трейтами, умения со специализациями, руны, артефакты, мастерство">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23a8792a'/%3E%3Ctext x='16' y='22' font-size='14' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3ET2%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2386601A'/%3E%3Ctext x='16' y='22' font-size='14' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3ET2%3C/text%3E%3C/svg%3E">
+<script src="../assets/theme.js"></script>
+<link rel="stylesheet" href="../assets/ui.css">
 <link rel="stylesheet" href="../calc/style.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
-  <a class="brand" href="./"><span class="logo">T2</span><div><b>Каталог билдов</b><small>Throne and Liberty · все классы</small></div></a>
-  <nav class="topnav">
-    <a href="../">Пресеты</a>
-    <a href="../calc/">Калькулятор</a>
-    <button id="themeBtn" class="ghost" title="Сменить тему" aria-label="Сменить тему">◐</button>
-  </nav>
-</header>
+<a class="skip btn primary" href="#main">Перейти к содержимому</a>
+<header class="site-top"><div class="in">
+  <a class="site-brand" href="../"><span class="site-logo" aria-hidden="true">T2</span><span>T2 Билды<small>Throne and Liberty</small></span></a>
+  <form class="site-search" action="./" method="get" role="search"><label class="sr-only" for="siteQ">Поиск билдов по названию, автору или классу</label><input id="siteQ" name="q" type="search" placeholder="Найти билд…" autocomplete="off"></form>
+  <nav class="site-nav" aria-label="Разделы сайта"><a href="./" aria-current="page">Каталог билдов</a><a href="../calc/">Калькулятор</a><a href="../">Пресеты</a></nav>
+  <div data-theme-switch></div>
+</div></header>
 
-<main id="listView" class="wrap">
-  <section class="filters panel" aria-label="Фильтры">
+<main id="main" tabindex="-1">
+<div id="listView" class="wrap">
+  <div class="page-h0">
+    <h1>Каталог билдов</h1>
+    <p>Билды всех классов с tl-build.ru. Выберите оружие, роль и режим или найдите билд по названию.</p>
+  </div>
+  <section class="filters panel" aria-label="Фильтры и сортировка">
     <div class="f-row">
-      <input id="q" type="search" placeholder="Поиск по названию или автору" autocomplete="off" aria-label="Поиск">
-      <select id="sort" aria-label="Сортировка">
-        <option value="top">Сначала лучшие</option>
-        <option value="views">Самые просматриваемые</option>
-        <option value="new">Сначала новые</option>
-        <option value="rating">По оценке</option>
-      </select>
+      <div class="f-block"><label class="f-lbl" for="q">Поиск</label>
+        <input id="q" type="search" placeholder="Название, автор или класс" autocomplete="off"></div>
+      <div class="f-block"><label class="f-lbl" for="sort">Сортировка</label>
+        <select id="sort">
+          <option value="top">Сначала лучшие</option>
+          <option value="views">Самые просматриваемые</option>
+          <option value="new">Сначала новые</option>
+          <option value="rating">По оценке</option>
+        </select></div>
     </div>
-    <div class="f-block">
-      <span class="f-lbl">Оружие <small>— до двух, покажу билды с этим оружием</small></span>
+    <div class="f-block" role="group" aria-labelledby="wLbl">
+      <span class="f-lbl" id="wLbl">Оружие <small>— до двух, покажу билды с этим оружием</small></span>
       <div id="weapons" class="chips"></div>
     </div>
     <div class="f-row f-row-wrap">
-      <div class="f-block"><span class="f-lbl">Роль</span><div id="role" class="seg"></div></div>
-      <div class="f-block"><span class="f-lbl">Режим</span><div id="mode" class="seg"></div></div>
+      <div class="f-block" role="group" aria-labelledby="rLbl"><span class="f-lbl" id="rLbl">Роль</span><div id="role" class="seg"></div></div>
+      <div class="f-block" role="group" aria-labelledby="mLbl"><span class="f-lbl" id="mLbl">Режим</span><div id="mode" class="seg"></div></div>
       <label class="chk"><input id="calcOnly" type="checkbox"> Открывается в калькуляторе</label>
     </div>
-    <div class="f-foot"><span id="count" class="pill"></span><button id="reset" class="ghost" type="button">Сбросить фильтры</button></div>
+    <div class="f-foot"><span id="count" class="pill" role="status" aria-live="polite"></span><button id="reset" class="text" type="button">Сбросить фильтры</button></div>
   </section>
-  <section id="grid" class="grid" aria-live="polite"></section>
+  <h2 class="sr-only">Результаты</h2>
+  <section id="grid" class="grid" aria-label="Список билдов"></section>
   <div class="more"><button id="moreBtn" class="ghost" type="button" hidden>Показать ещё</button></div>
+</div>
+<div id="buildView" class="wrap" hidden></div>
 </main>
 
-<main id="buildView" class="wrap" hidden></main>
+<dialog id="viewer" class="viewer" aria-label="Просмотр изображения">
+  <figure><img id="viewerImg" alt=""><figcaption id="viewerCap"></figcaption></figure>
+  <div class="v-bar">
+    <button type="button" class="ghost" id="vPrev" aria-label="Предыдущее изображение">←</button>
+    <a class="btn ghost" id="vOpen" target="_blank" rel="noopener">Открыть оригинал ↗</a>
+    <button type="button" class="ghost" id="vNext" aria-label="Следующее изображение">→</button>
+    <button type="button" class="primary" id="vClose">Закрыть</button>
+  </div>
+</dialog>
 
-<footer class="foot">
+<footer class="site-foot">
   Билды собраны с <a href="https://tl-build.ru" target="_blank" rel="noopener">tl-build.ru</a> — у каждого указан автор и ссылка на оригинал.
   Названия, иконки предметов и умений — база <a href="https://build.tlwg.ru" target="_blank" rel="noopener">build.tlwg.ru</a>.
   <span id="built"></span>
 </footer>
-<div id="toast" class="toast" role="status"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>
 </html>

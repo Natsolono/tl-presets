@@ -60,7 +60,7 @@ function filtersUI() {
     b.onclick = () => { const i = F.w.indexOf(w); if (i >= 0) F.w.splice(i, 1); else if (F.w.length < 2) F.w.push(w); apply(); };
     wbox.append(b);
   });
-  const seg = (box, list, key) => { box.innerHTML = ''; list.forEach(([v, t]) => { const b = el('button', null, t); b.type = 'button'; b.dataset.v = v; b.onclick = () => { F[key] = v; apply(); }; box.append(b); }); };
+  const seg = (box, list, key) => { box.innerHTML = ''; list.forEach(([v, t]) => { const b = el('button', 'seg-b', t); b.type = 'button'; b.dataset.v = v; b.onclick = () => { F[key] = v; apply(); }; box.append(b); }); };
   seg($('#role'), ROLES, 'role'); seg($('#mode'), MODES, 'mode');
   let qt; $('#q').oninput = e => { clearTimeout(qt); qt = setTimeout(() => { F.q = e.target.value; apply(); }, 150); };
   $('#sort').onchange = e => { F.sort = e.target.value; apply(); };
@@ -77,15 +77,15 @@ function syncUI() {
 function apply() {
   store.set('tlb-filters', F); syncUI();
   const q = F.q.trim().toLowerCase();
-  view = CAT.filter(b => (!q || b.n.toLowerCase().includes(q) || b.a.toLowerCase().includes(q))
+  view = CAT.filter(b => (!q || b.n.toLowerCase().includes(q) || b.a.toLowerCase().includes(q) || b.cls.includes(q))
     && F.w.every(w => b.w.includes(w)) && (!F.role || b.role === F.role) && (!F.mode || b.mode === F.mode) && (!F.calc || b.calc));
   const by = { top: (a, b) => b.score - a.score || b.v - a.v, views: (a, b) => b.v - a.v, new: (a, b) => (b.d || '').localeCompare(a.d || '') || b.id - a.id, rating: (a, b) => b.rt - a.rt || b.rc - a.rc };
   view.sort(by[F.sort] || by.top);
-  $('#count').textContent = view.length ? `Найдено: ${nf(view.length)}` : 'Ничего не найдено';
+  $('#count').textContent = view.length ? `Найдено: ${nf(view.length)}` : 'Ничего не найдено'; $('#siteQ').value = F.q;
   $('#grid').innerHTML = ''; shown = 0; renderMore();
 }
 function card(b) {
-  const a = el('a', 'card'); a.href = '#' + b.id;
+  const a = el('a', 'card'); a.href = '#' + b.id; a.dataset.id = b.id;
   const th = el('div', 'thumb');
   if (b.img) { const i = el('img'); i.loading = 'lazy'; i.alt = ''; i.src = 'img/' + b.id + '.webp'; i.onerror = () => i.replaceWith(el('div', 'ph', clsName(b.w))); th.append(i); }
   else th.append(el('div', 'ph', clsName(b.w)));
@@ -136,15 +136,22 @@ function itemCard(e) {
 }
 function skillCard([id, lv, specs]) {
   const s = D.skills[id] || {};
-  const c = el('div', 'sk'); c.title = s.d || '';
+  const c = el('div', 'sk');
   c.append(icon(s.ic, s.n));
   const info = el('div'); info.append(el('div', 'nm', s.n || id));
   const meta = []; if (lv) meta.push('ур. ' + lv); if (s.cd) meta.push('перезарядка ' + s.cd + ' с'); if (s.w) meta.push(W_RU[s.w] || s.w);
   info.append(el('div', 'lv', meta.join(' · '))); c.append(info);
   if (specs && specs.length) {
     const box = el('div', 'specs');
-    specs.forEach(sp => { const d = D.specs[sp] || {}; const t = el('span', 'spec'); t.title = d.d || ''; t.append(icon(d.ic, '', true), document.createTextNode(d.n || sp.replace(/^SkillSet_/, ''))); box.append(t); });
+    specs.forEach(sp => { const d = D.specs[sp] || {}; const t = el('span', 'spec'); t.append(icon(d.ic, '', true), document.createTextNode(d.n || sp.replace(/^SkillSet_/, ''))); box.append(t); });
     c.append(box);
+  }
+  const sd = (specs || []).map(sp => D.specs[sp]).filter(d => d && d.d);
+  if (s.d || sd.length) {
+    const det = el('details', 'sk-d'); det.append(el('summary', null, 'Описание'));
+    if (s.d) det.append(el('p', null, s.d));
+    sd.forEach(d => { const p = el('p'); p.append(el('b', null, d.n + ': '), document.createTextNode(d.d)); det.append(p); });
+    c.append(det);
   }
   return c;
 }
@@ -159,10 +166,10 @@ function renderLoadout(box, b, lo) {
   const s2 = section('Умения');
   const parts = [['Активные', lo.act], ['Пассивные', lo.pas], ['Защитное', lo.def ? [lo.def] : []]];
   parts.forEach(([t, list]) => { if (!list || !list.length) return; s2.append(el('div', 'sk-h', t)); const gg = el('div', 'skills'); list.forEach(x => gg.append(skillCard(x))); s2.append(gg); });
-  s2.append(el('p', 'hint', 'Наведите на умение или специализацию, чтобы прочитать описание.'));
+  s2.append(el('p', 'hint', 'Нажмите «Описание» под умением, чтобы прочитать, что оно делает и как его меняют специализации.'));
   left.append(s2);
   // описание
-  if (b.desc) { const s3 = section('Описание от автора'); const d = el('div', 'desc'); d.innerHTML = b.desc; s3.append(d); left.append(s3); }
+  if (b.desc) { const s3 = section('Описание от автора'); const d = el('div', 'desc'); d.innerHTML = b.desc; s3.append(d); left.append(s3); wireDescImages(d, b); }
   // характеристики
   const s4 = section('Характеристики', lo.lvl ? el('span', 'pill', 'уровень ' + lo.lvl) : null);
   const ab = el('div', 'attr-bars');
@@ -201,17 +208,20 @@ function renderLoadout(box, b, lo) {
   }
   g.append(left, right); box.append(g);
 }
+let lastScroll = 0, lastId = null;
 async function showBuild(id, loIdx) {
+  if (!$('#listView').hidden) { lastScroll = window.scrollY; }
+  lastId = id;
   $('#listView').hidden = true; const v = $('#buildView'); v.hidden = false;
   v.innerHTML = ''; v.append(el('div', 'loading', 'Загружаю билд…')); window.scrollTo(0, 0);
   let b;
   try { await loadDict(); const r = await fetch('b/' + id + '.json'); if (!r.ok) throw 0; b = await r.json(); }
   catch (e) { v.innerHTML = ''; v.append(backBtn(), el('p', 'empty', 'Билд не найден.')); return; }
   document.title = (b.n || 'Билд') + ' · Каталог билдов';
-  v.innerHTML = ''; v.append(backBtn());
+  v.innerHTML = ''; v.append(backBtn()); GAL = [];
   const hero = el('section', 'hero panel');
   const l = el('div');
-  l.append(el('h1', null, b.n || 'Без названия'));
+  const h1 = el('h1', null, b.n || 'Без названия'); h1.tabIndex = -1; l.append(h1);
   l.append(el('div', 'sub', `${clsName(b.w)} · автор ${b.a || 'аноним'}${b.d ? ' · ' + new Date(b.d).toLocaleDateString('ru-RU') : ''}`));
   const bd = el('div', 'badges');
   if (b.role) bd.append(el('span', 'bdg r-' + b.role, ROLE_RU[b.role] || b.role));
@@ -224,11 +234,16 @@ async function showBuild(id, loIdx) {
   const act = el('div', 'actions');
   const calcBtn = el('a', 'btn primary', '🧮 Открыть в калькуляторе'); calcBtn.hidden = true;
   const orig = el('a', 'btn', 'Оригинал на tl-build.ru ↗'); orig.href = b.url; orig.target = '_blank'; orig.rel = 'noopener';
-  const share = el('button', 'btn', '🔗 Ссылка'); share.type = 'button';
+  const share = el('button', 'ghost', '🔗 Скопировать ссылку'); share.type = 'button';
   share.onclick = () => { const u = location.href; navigator.clipboard.writeText(u).then(() => toast('Ссылка скопирована'), () => prompt('Ссылка на билд:', u)); };
   act.append(calcBtn, orig, share); l.append(act);
-  const r = el('div', 'thumb');
-  if (b.img) { const i = el('img'); i.alt = 'Превью билда'; i.src = 'img/' + b.id + '.webp'; i.onerror = () => r.remove(); r.append(i); } else r.append(el('div', 'ph', 'Превью нет'));
+  let r;
+  if (b.img) {
+    r = el('button', 'thumb zoom'); r.type = 'button'; r.setAttribute('aria-label', 'Открыть превью в полном размере');
+    const i = el('img'); i.alt = `Превью билда «${b.n || ''}»: ${clsName(b.w)}`; i.src = 'img/' + b.id + '.webp'; i.onerror = () => r.remove(); r.append(i, el('span', 'zoom-ic', '⤢'));
+    const k = GAL.push({ src: 'img/full/' + b.id + '.webp', fallback: 'img/' + b.id + '.webp', cap: 'Превью: ' + (b.n || '') }) - 1;
+    r.onclick = () => openViewer(k);
+  } else { r = el('div', 'thumb'); r.append(el('div', 'ph', 'Превью нет')); }
   hero.append(l, r); v.append(hero);
   const tabs = el('div', 'tabs'); tabs.setAttribute('role', 'tablist');
   const body = el('div');
@@ -240,25 +255,55 @@ async function showBuild(id, loIdx) {
     renderLoadout(body, b, lo);
   };
   if (b.los.length > 1) {
-    b.los.forEach((lo, i) => { const t = el('button', null, lo.n || 'Вариант ' + (i + 1)); t.type = 'button'; t.setAttribute('role', 'tab'); t.onclick = () => pick(i); tabs.append(t); });
+    b.los.forEach((lo, i) => { const t = el('button', 'tab', lo.n || 'Вариант ' + (i + 1)); t.type = 'button'; t.setAttribute('role', 'tab'); t.onclick = () => pick(i); tabs.append(t); });
     v.append(tabs);
   }
   v.append(body); pick(Math.min(loIdx || 0, b.los.length - 1));
+  h1.focus({ preventScroll: true });
+}
+/* ---------- просмотр картинок в полный размер ---------- */
+let GAL = [], gi = 0;
+function wireDescImages(box, b) {
+  box.querySelectorAll('img').forEach(img => {
+    const src = img.getAttribute('src');
+    const k = GAL.push({ src, fallback: src, cap: 'Иллюстрация из описания' }) - 1;
+    if (!img.alt) img.alt = 'Иллюстрация из описания билда';
+    const btn = el('button', 'zoom inline'); btn.type = 'button'; btn.setAttribute('aria-label', 'Открыть иллюстрацию в полном размере');
+    img.replaceWith(btn); btn.append(img); btn.onclick = () => openViewer(k);
+  });
+}
+function openViewer(k) {
+  if (!GAL.length) return;
+  gi = (k + GAL.length) % GAL.length; const g = GAL[gi]; const im = $('#viewerImg');
+  im.onerror = () => { if (im.src.indexOf(g.fallback) < 0) im.src = g.fallback; };
+  im.src = g.src; im.alt = g.cap; $('#viewerCap').textContent = g.cap + (GAL.length > 1 ? ` · ${gi + 1} из ${GAL.length}` : '');
+  $('#vOpen').href = g.src; $('#vPrev').hidden = $('#vNext').hidden = GAL.length < 2;
+  const d = $('#viewer'); if (!d.open) d.showModal();
+}
+function viewerUI() {
+  const d = $('#viewer');
+  $('#vClose').onclick = () => d.close();
+  $('#vPrev').onclick = () => openViewer(gi - 1); $('#vNext').onclick = () => openViewer(gi + 1);
+  d.addEventListener('click', e => { if (e.target === d) d.close(); });
+  d.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') openViewer(gi - 1); if (e.key === 'ArrowRight') openViewer(gi + 1); });
 }
 function backBtn() { const a = el('a', 'btn back', '← Все билды'); a.href = '#'; return a; }
 function route() {
   const m = location.hash.match(/^#(\d+)(?:\/(\d+))?/);
   if (m) return showBuild(m[1], m[2] ? +m[2] - 1 : 0);
   document.title = 'Каталог билдов';
+  const wasBuild = !$('#buildView').hidden;
   $('#buildView').hidden = true; $('#listView').hidden = false;
+  if (wasBuild) { window.scrollTo(0, lastScroll); const c = lastId && document.querySelector(`.card[data-id="${lastId}"]`); if (c) c.focus({ preventScroll: true }); }
 }
 
 async function init() {
-  const theme = store.get('t2calc-theme', null); if (theme) document.documentElement.dataset.theme = theme;
-  $('#themeBtn').onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); const nx = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = nx; store.set('t2calc-theme', nx); };
-  filtersUI();
+  const qp = new URLSearchParams(location.search).get('q');
+  if (qp != null) { Object.assign(F, { q: qp, w: [], role: '', mode: '', calc: false }); history.replaceState(null, '', location.pathname + location.hash); }
+  $('.site-search').addEventListener('submit', e => { e.preventDefault(); F.q = $('#siteQ').value; if (location.hash) location.hash = ''; apply(); $('#grid').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  filtersUI(); viewerUI();
   const c = await (await fetch('catalog.json')).json();
-  CAT = c.items.map(b => Object.assign(b, { score: b.rt * Math.min(b.rc, 20) + Math.log10(1 + b.v) }));
+  CAT = c.items.map(b => Object.assign(b, { score: b.rt * Math.min(b.rc, 20) + Math.log10(1 + b.v), cls: (clsName(b.w) + ' ' + b.w.join(' ')).toLowerCase() }));
   $('#built').textContent = `Обновлено ${new Date(c.built).toLocaleDateString('ru-RU')}, билдов: ${nf(CAT.length)}.`;
   apply();
   window.addEventListener('hashchange', route); route();
