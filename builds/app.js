@@ -291,13 +291,15 @@ function viewerUI() {
   d.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') openViewer(gi - 1); if (e.key === 'ArrowRight') openViewer(gi + 1); });
 }
 /* ---------- комментарии: Giscus (обсуждения GitHub, вход через аккаунт GitHub) ---------- */
-const GISCUS = { repo: 'Natsolono/tl-presets', repoId: '__REPO_ID__', category: 'Комментарии к билдам', categoryId: '__CATEGORY_ID__' };
+const GISCUS = { enabled: false, repo: 'Natsolono/tl-presets', repoId: 'R_kgDOVuSVeg', category: 'Announcements', categoryId: 'DIC_kwDOVuSVes4DLTZD' };
+// enabled: true — после установки приложения https://github.com/apps/giscus в репозиторий
+
 const giscusTheme = () => document.documentElement.dataset.theme === 'dark' ? 'dark_dimmed' : 'light';
 function comments(b) {
   const sec = section('Обсуждение'); const box = el('div', 'giscus');
-  if (GISCUS.repoId.startsWith('__')) { sec.append(el('p', 'hint', 'Комментарии скоро появятся.')); return sec; }
   sec.append(el('p', 'hint', 'Отзывы и вопросы автору. Чтобы написать, войдите через аккаунт GitHub. Поддерживается форматирование Markdown.'), box);
-  const load = () => {
+  const load = async () => {
+    if (!GISCUS.enabled) { box.append(el('p', 'hint', 'Комментарии скоро появятся.')); return; }
     const sc = document.createElement('script'); sc.src = 'https://giscus.app/client.js'; sc.async = true; sc.crossOrigin = 'anonymous';
     Object.entries({ 'data-repo': GISCUS.repo, 'data-repo-id': GISCUS.repoId, 'data-category': GISCUS.category, 'data-category-id': GISCUS.categoryId,
       'data-mapping': 'specific', 'data-term': 'Билд ' + b.id + ': ' + (b.n || ''), 'data-strict': '1', 'data-reactions-enabled': '1', 'data-emit-metadata': '0',
