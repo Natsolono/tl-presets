@@ -291,7 +291,7 @@ function viewerUI() {
   d.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') openViewer(gi - 1); if (e.key === 'ArrowRight') openViewer(gi + 1); });
 }
 /* ---------- комментарии: Giscus (обсуждения GitHub, вход через аккаунт GitHub) ---------- */
-const GISCUS = { enabled: false, repo: 'Natsolono/tl-presets', repoId: 'R_kgDOVuSVeg', category: 'Announcements', categoryId: 'DIC_kwDOVuSVes4DLTZD' };
+const GISCUS = { enabled: true, repo: 'Natsolono/tl-presets', repoId: 'R_kgDOVuSVeg', category: 'Announcements', categoryId: 'DIC_kwDOVuSVes4DLTZD' };
 // enabled: true — после установки приложения https://github.com/apps/giscus в репозиторий
 
 const giscusTheme = () => document.documentElement.dataset.theme === 'dark' ? 'dark_dimmed' : 'light';
