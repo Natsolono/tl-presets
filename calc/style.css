@@ -115,24 +115,87 @@ dialog{padding:0;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 40p
 #exportDlg{width:min(720px,calc(100vw - 24px))}
 .sk-wrap{margin-top:var(--s3)}
 
-/* мастерство */
+/* мастерство — SVG деревья */
 .ms-wrap{display:grid;gap:var(--s3);margin-top:var(--s3)}
+.ms-trees{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:var(--s3)}
+.ms-svgtree{border-radius:var(--r);overflow:hidden;border:1px solid #1e2d40;background:#080e1a;display:grid}
+.ms-svgtree-h{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid #1e2d40;background:rgba(255,255,255,.025)}
+.ms-svgtree-h b{flex:1;min-width:0;font-size:13px;color:#d4a853}
+.ms-svgtree-h .pill{color:rgba(255,255,255,.45);border-color:rgba(255,255,255,.12);font-size:11.5px}
+.ms-svgtree-h .ghost{color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.12);font-size:11.5px;padding:2px 7px;min-height:26px}
+.ms-svgtree-h .ghost:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+.ms-svg{width:100%;display:block;aspect-ratio:1}
+.ms-node{cursor:pointer;transition:opacity .12s}
+.ms-node circle,.ms-node rect{transition:opacity .12s}
+.ms-node:hover>circle,.ms-node:hover>rect{opacity:.82}
+.ms-node.on>circle,.ms-node.on>rect{filter:drop-shadow(0 0 2px currentColor)}
+.ms-treesum{padding:7px 10px;border-top:1px solid #1e2d40;background:rgba(255,255,255,.02)}
+.ms-treesum summary{cursor:pointer;color:rgba(255,255,255,.35);font-size:12px;padding:2px 0}
+.ms-treesum .kv{border-color:rgba(255,255,255,.07);color:rgba(255,255,255,.65);font-size:12.5px}
+.ms-treesum .kv b{color:rgba(255,255,255,.9)}
+
+/* мастерство — общие умения (карточки) */
 .ms-tree{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
 .ms-tree>summary{display:flex;gap:8px;align-items:center;padding:8px 10px;cursor:pointer;border-radius:var(--r)}
 .ms-tree>summary b{flex:1;min-width:0}
 .ms-tree[open]>summary{border-bottom:1px solid var(--line)}
-.ms-tree>.hint,.ms-tools{padding:6px 10px 0;margin:0}
-.ms-tier{padding:8px 10px}
-.ms-tier h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:0 0 6px}
+.ms-tree>.hint{padding:6px 10px 0;margin:0}
 .ms-tree>.ms-grid{padding:8px 10px 10px}
 .ms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:8px}
 .msn{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:6px 8px;display:grid;gap:6px;align-content:start;min-width:0}
 .msn.on{border-color:var(--acc);background:var(--acc-soft)}
-.msn.syn{border-style:dashed}.msn.syn.on{border-style:solid}
 .msn-h{display:flex;gap:8px;align-items:center;min-width:0}
 .msn-t{display:grid;min-width:0}.msn-t b{font-size:13.5px;line-height:1.25}.msn-t small{color:var(--mute);font-size:12px}
-.msn-ctl{display:flex;gap:6px;align-items:center}
-.msn-ctl button.ghost{min-width:32px;min-height:32px;padding:0}
-.msn-ctl b{min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
-.msn-s{margin:0;font-size:12.5px;color:var(--mute);line-height:1.4}
 .msn .sp-chip{justify-self:start;padding:3px 10px}
+
+/* лоадауты */
+.loadout-bar{display:flex;gap:6px;margin-bottom:12px;padding:3px;border:1px solid var(--line);border-radius:var(--pill);background:var(--surface-2);width:fit-content}
+.loadout-btn{font-size:13px;padding:5px 14px;min-height:32px;border-radius:var(--pill);border:1px solid transparent;background:transparent;color:var(--mute);font-weight:500;transition:background var(--t),color var(--t),border-color var(--t)}
+.loadout-btn:hover{background:var(--surface);color:var(--ink)}
+.loadout-btn.active{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600;box-shadow:0 2px 8px var(--gold-glow)}
+
+/* артефакты */
+/* руны в редакторе предмета */
+.rune-det{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.rune-det>summary{display:flex;gap:8px;align-items:center;padding:7px 10px;cursor:pointer;border-radius:var(--r);font-size:13px}
+.rune-det>summary b{flex:1}
+.rune-det[open]>summary{border-bottom:1px solid var(--line)}
+.rune-rows{display:grid;gap:5px;padding:7px 10px}
+.rune-row{display:flex;gap:6px;align-items:center}
+.rune-btn{flex:1;display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);text-align:left;cursor:pointer;color:var(--ink);transition:border-color var(--t)}
+.rune-btn:hover{border-color:var(--acc)}
+.rune-name{font-size:13px;font-weight:600}
+.rune-stats{font-size:12px;color:var(--mute)}
+.rune-empty{font-size:12.5px;color:var(--mute)}
+.rune-rm{width:28px;height:28px;min-height:28px;padding:0;font-size:14px;flex:0 0 auto;border-radius:50%}
+#runePicker{width:min(540px,calc(100vw - 24px))}
+.pick-info{display:grid;gap:2px;min-width:0}
+/* артефакты */
+.afx-slots{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.afx-slot{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface-2);text-align:left;cursor:pointer;position:relative;min-height:52px;transition:border-color var(--t),box-shadow var(--t)}
+.afx-slot:hover{border-color:var(--acc)}
+.afx-ico{width:36px;height:36px;flex:0 0 auto;display:grid;place-items:center;font-size:18px;border-radius:8px;border:1px solid var(--line);background:var(--surface);overflow:hidden}
+.afx-ico img{width:100%;height:100%;object-fit:contain}
+.afx-info{flex:1;min-width:0;display:grid;gap:2px}
+.afx-name{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.afx-empty{font-size:12px;color:var(--mute)}
+.afx-rm{position:absolute;top:4px;right:4px;width:20px;height:20px;min-height:20px;padding:0;font-size:14px;line-height:1;border-radius:50%;border:1px solid var(--line);background:var(--surface)}
+.afx-sets{display:grid;gap:7px;margin-top:4px}
+.afx-statdet,.afx-setdet{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.afx-statdet>summary,.afx-setdet>summary{display:flex;gap:8px;align-items:center;padding:7px 10px;cursor:pointer;border-radius:var(--r);font-size:13px}
+.afx-statdet>summary{color:var(--mute)}.afx-setdet>summary b{flex:1}
+.afx-statdet[open]>summary,.afx-setdet[open]>summary{border-bottom:1px solid var(--line)}
+.afx-statdet .kv,.afx-setdet .kv{padding:0 10px;font-size:12.5px}
+.afx-statdet .kv:first-of-type{padding-top:5px}.afx-statdet .kv:last-of-type{padding-bottom:5px}
+.afx-bn-active{display:block;padding:5px 10px;font-size:12.5px;color:var(--acc)}
+.afx-bn-locked{display:block;padding:5px 10px;font-size:12.5px;color:var(--mute);text-decoration:line-through;opacity:.6}
+.afx-bn-active+.afx-bn-active,.afx-bn-active+.afx-bn-locked,.afx-bn-locked+.afx-bn-active,.afx-bn-locked+.afx-bn-locked{border-top:1px dashed var(--line)}
+#afxPicker{width:min(520px,calc(100vw - 24px))}
+/* публикация */
+#publishDlg{width:min(480px,calc(100vw - 24px))}
+.pub-body{display:grid;gap:6px;padding:12px 14px}
+.pub-body label{font-size:12.5px;color:var(--mute);display:grid;gap:4px}
+.pub-body input,.pub-body textarea{font-size:13.5px}
+.pub-body textarea{resize:vertical}
+.pub-req{color:var(--bad)}
+.pub-status{font-size:13px;color:var(--acc);flex:1}

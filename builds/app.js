@@ -1,5 +1,4 @@
 'use strict';
-/* Каталог T2-билдов. Данные: tl-build.ru (билды, авторы), build.tlwg.ru (названия, иконки). */
 const $ = s => document.querySelector(s);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const toast = t => { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 1800); };
@@ -91,13 +90,22 @@ function card(b) {
   const body = el('div', 'c-body');
   body.append(el('div', 'c-title', b.n || 'Без названия'), el('div', 'c-cls', clsName(b.w)));
   const bd = el('div', 'badges');
-  if (b.role) bd.append(el('span', 'bdg r-' + b.role, ROLE_RU[b.role] || b.role));
-  if (b.mode) bd.append(el('span', 'bdg', MODE_RU[b.mode] || b.mode));
-  if (b.lo > 1) bd.append(el('span', 'bdg', b.lo + ' варианта'));
+  if (b.user) {
+    bd.append(el('span', 'bdg bdg-user', 'Пользователь'));
+    if (b.gs) bd.append(el('span', 'bdg', 'GS ' + nf(b.gs)));
+  } else {
+    if (b.role) bd.append(el('span', 'bdg r-' + b.role, ROLE_RU[b.role] || b.role));
+    if (b.mode) bd.append(el('span', 'bdg', MODE_RU[b.mode] || b.mode));
+    if (b.lo > 1) bd.append(el('span', 'bdg', b.lo + ' варианта'));
+  }
   body.append(bd);
   const m = el('div', 'c-meta');
-  const s1 = el('span'); s1.append('★ ', el('b', null, b.rt ? b.rt.toFixed(1) : '—'), b.rc ? ` (${b.rc})` : ''); m.append(s1);
-  m.append(el('span', null, '👁 ' + nf(b.v)), el('span', null, b.a || 'аноним'));
+  if (b.user) {
+    m.append(el('span', null, '👍 ' + nf(b.rc)), el('span', null, b.a || 'аноним'));
+  } else {
+    const s1 = el('span'); s1.append('★ ', el('b', null, b.rt ? b.rt.toFixed(1) : '—'), b.rc ? ` (${b.rc})` : ''); m.append(s1);
+    m.append(el('span', null, '👁 ' + nf(b.v)), el('span', null, b.a || 'аноним'));
+  }
   body.append(m); a.append(th, body); return a;
 }
 function renderMore() {
@@ -189,22 +197,69 @@ function renderLoadout(box, b, lo) {
     s5.append(ag); right.append(s5);
   }
   // мастерство
-  const wl = Object.entries(lo.msw || {}); const nodes = Object.entries(lo.ms || {});
-  if (wl.length || nodes.length || lo.msl) {
-    const s6 = section('Мастерство', lo.msl ? el('span', 'pill', 'уровень ' + lo.msl) : null);
-    if (wl.length) { const w = el('div', 'ms-w'); wl.forEach(([k, v]) => w.append(el('span', 'bdg', `${(D.mw || {})[k] || MS_W[k] || k}: ${v}`))); s6.append(w); }
-    nodes.forEach(([wk, list]) => {
-      const det = el('details', 'all'); const n = Object.keys(list).length;
-      det.append(el('summary', null, `${(D.mw || {})[wk] || MS_W[wk] || wk}: узлов ${n}`));
-      const ul = el('ul', 'ms-nodes');
-      Object.entries(list).forEach(([id, v]) => { const m = (D.ms || {})[id]; const li = el('li'); const nm = el('span'); nm.append(icon(m && m.ic, '', true), document.createTextNode(m ? m.n : msNode(id))); if (m && m.cat) nm.title = m.cat; li.append(nm, el('span', 'muted', 'ур. ' + v)); ul.append(li); });
-      det.append(ul); s6.append(det);
-    });
-    const common = (lo.msc || []).filter(Boolean);
-    if (common.length) {
-      const det = el('details', 'all'); det.append(el('summary', null, `Общие умения мастерства: ${common.length}`));
-      const ul = el('ul', 'ms-common'); common.forEach(x => { const c = (D.msc || {})[x] || {}; const li = el('li'); const h = el('div', 'mc-h'); h.append(icon(c.ic, '', true), el('b', null, c.n || x)); li.append(h); if (c.t) li.append(el('p', null, c.t)); ul.append(li); });
-      det.append(ul); s6.append(det);
+  const msNodeMap = lo.ms || {};
+  const msWepLvls = lo.msw || {};
+  const msCommon = (lo.msc || []).filter(Boolean);
+  const msWepKeys = Object.keys(msNodeMap).filter(wk => Object.keys(msNodeMap[wk]).length > 0);
+  if (lo.msl != null || msWepKeys.length || msCommon.length) {
+    const s6 = section('Мастерство владения оружием', lo.msl ? el('span', 'pill', 'уровень ' + lo.msl) : null);
+    if (!msWepKeys.length && !msCommon.length) {
+      s6.append(el('p', 'ms-empty', 'Автор пока не вложил очки в T2-мастерство этим оружием.'));
+    } else {
+      const TIER_ORDER = ['Normal', 'High', 'Rare', 'Hero'];
+      const TIER_RU = { Normal: 'Обычный', High: 'Высший', Rare: 'Редкий', Hero: 'Героический' };
+      const TIER_CLS = { Normal: 'tn', High: 'th', Rare: 'tr', Hero: 'thr' };
+      msWepKeys.forEach(wk => {
+        const nodeList = msNodeMap[wk];
+        const wName = (D.mw || {})[wk] || MS_W[wk] || wk;
+        const wLv = msWepLvls[wk];
+        const wb = el('div', 'ms-weapon');
+        const wh = el('div', 'ms-whead');
+        wh.append(el('b', null, wName));
+        if (wLv != null) wh.append(el('span', 'bdg', 'мастерство ' + wLv));
+        wb.append(wh);
+        const byTier = {};
+        Object.entries(nodeList).forEach(([id, lv]) => {
+          const m = String(id).match(/^[A-Za-z0-9]+?_(Normal|High|Rare|Hero)_/);
+          const tier = m ? m[1] : 'Normal';
+          (byTier[tier] || (byTier[tier] = [])).push({ id, lv });
+        });
+        TIER_ORDER.forEach(tier => {
+          if (!byTier[tier]) return;
+          const td = el('div', 'ms-tier');
+          td.append(el('div', 'ms-tier-h ' + (TIER_CLS[tier] || ''), TIER_RU[tier] || tier));
+          const grid = el('div', 'ms-grid');
+          byTier[tier].forEach(({ id, lv }) => {
+            const nd = (D.ms || {})[id] || {};
+            const chip = el('div', 'ms-node');
+            if (nd.cat) chip.title = nd.cat;
+            chip.append(icon(nd.ic, '', true));
+            const nfo = el('div', 'ms-ninfo');
+            nfo.append(el('span', 'ms-nname', nd.n || msNode(id)));
+            nfo.append(el('span', 'ms-nlv muted', 'ур. ' + lv + (nd.max ? '/' + nd.max : '')));
+            chip.append(nfo);
+            grid.append(chip);
+          });
+          td.append(grid); wb.append(td);
+        });
+        s6.append(wb);
+      });
+      if (msCommon.length) {
+        const cb = el('div', 'ms-weapon');
+        cb.append(el('div', 'ms-whead', 'Общие умения мастерства'));
+        const grid = el('div', 'ms-grid');
+        msCommon.forEach(x => {
+          const c = (D.msc || {})[x] || {};
+          const chip = el('div', 'ms-node ms-node-wide');
+          chip.append(icon(c.ic, '', true));
+          const nfo = el('div', 'ms-ninfo');
+          nfo.append(el('b', 'ms-nname', c.n || x));
+          if (c.t) nfo.append(el('span', 'ms-ndesc muted', c.t));
+          chip.append(nfo);
+          grid.append(chip);
+        });
+        cb.append(grid); s6.append(cb);
+      }
     }
     right.append(s6);
   }
@@ -217,14 +272,14 @@ async function showBuild(id, loIdx) {
   $('#listView').hidden = true; const v = $('#buildView'); v.hidden = false;
   v.innerHTML = ''; v.append(el('div', 'loading', 'Загружаю билд…')); window.scrollTo(0, 0);
   let b;
-  try { await loadDict(); const r = await fetch('b/' + id + '.json'); if (!r.ok) throw 0; b = await r.json(); }
+  try { await loadDict(); const r = await fetch('../api/build.php?id=' + id); if (!r.ok) throw 0; b = await r.json(); }
   catch (e) { v.innerHTML = ''; v.append(backBtn(), el('p', 'empty', 'Билд не найден.')); return; }
-  document.title = (b.n || 'Билд') + ' · Каталог билдов';
+  document.title = (b.n || 'Билд') + ' · T2 Билды';
   v.innerHTML = ''; v.append(backBtn()); GAL = [];
   const hero = el('section', 'hero panel');
   const l = el('div');
   const h1 = el('h1', null, b.n || 'Без названия'); h1.tabIndex = -1; l.append(h1);
-  l.append(el('div', 'sub', `${clsName(b.w)} · автор ${b.a || 'аноним'}${b.d ? ' · ' + new Date(b.d).toLocaleDateString('ru-RU') : ''}`));
+  l.append(el('div', 'sub', `${clsName(b.w)} · автор ${b.a || 'аноним'}${b.d ? ' · ' + new Date(b.d + 'T12:00:00').toLocaleDateString('ru-RU') : ''}`));
   const bd = el('div', 'badges');
   if (b.role) bd.append(el('span', 'bdg r-' + b.role, ROLE_RU[b.role] || b.role));
   if (b.mode) bd.append(el('span', 'bdg', MODE_RU[b.mode] || b.mode));
@@ -235,10 +290,9 @@ async function showBuild(id, loIdx) {
   l.append(sr);
   const act = el('div', 'actions');
   const calcBtn = el('a', 'btn primary', '🧮 Открыть в конструкторе'); calcBtn.hidden = true;
-  const orig = el('a', 'btn', 'Оригинал на tl-build.ru ↗'); orig.href = b.url; orig.target = '_blank'; orig.rel = 'noopener';
   const share = el('button', 'ghost', '🔗 Скопировать ссылку'); share.type = 'button';
   share.onclick = () => { const u = b.u ? new URL('../' + b.u, location.href).href : location.href; navigator.clipboard.writeText(u).then(() => toast('Ссылка скопирована'), () => prompt('Ссылка на билд:', u)); };
-  act.append(calcBtn, orig, share); l.append(act);
+  act.append(calcBtn, share); l.append(act);
   let r;
   if (b.img) {
     r = el('button', 'thumb zoom'); r.type = 'button'; r.setAttribute('aria-label', 'Открыть превью в полном размере');
@@ -260,6 +314,7 @@ async function showBuild(id, loIdx) {
     b.los.forEach((lo, i) => { const t = el('button', 'tab', lo.n || 'Вариант ' + (i + 1)); t.type = 'button'; t.setAttribute('role', 'tab'); t.onclick = () => pick(i); tabs.append(t); });
     v.append(tabs);
   }
+  if (!b.los || !b.los.length) { v.append(el('p', 'empty', 'Данные билда повреждены.')); return; }
   v.append(body); pick(Math.min(loIdx || 0, b.los.length - 1));
   v.append(comments(b));
   h1.focus({ preventScroll: true });
@@ -312,10 +367,51 @@ function comments(b) {
 new MutationObserver(() => { const f = document.querySelector('iframe.giscus-frame'); if (f) f.contentWindow.postMessage({ giscus: { setConfig: { theme: giscusTheme() } } }, 'https://giscus.app'); })
   .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 function backBtn() { const a = el('a', 'btn back', '← Все билды'); a.href = '#'; return a; }
+async function showUserBuild(id) {
+  if (!$('#listView').hidden) { lastScroll = window.scrollY; }
+  lastId = 'u' + id;
+  $('#listView').hidden = true; const v = $('#buildView'); v.hidden = false;
+  v.innerHTML = ''; v.append(el('div', 'loading', 'Загружаю билд…')); window.scrollTo(0, 0);
+  let b;
+  try { const r = await fetch('../api/user_build.php?id=' + id); if (!r.ok) throw 0; b = await r.json(); }
+  catch (e) { v.innerHTML = ''; v.append(backBtn(), el('p', 'empty', 'Билд не найден.')); return; }
+  document.title = (b.name || 'Билд') + ' · T2 Билды';
+  v.innerHTML = ''; v.append(backBtn());
+  const hero = el('section', 'hero panel');
+  const l = el('div');
+  const h1 = el('h1', null, b.name || 'Без названия'); h1.tabIndex = -1; l.append(h1);
+  const dateStr = b.created_at ? ' · ' + new Date(b.created_at.replace(' ', 'T')).toLocaleDateString('ru-RU') : '';
+  l.append(el('div', 'sub', clsName([b.weapon1, b.weapon2]) + ' · автор ' + (b.author || 'аноним') + dateStr));
+  const bd = el('div', 'badges');
+  bd.append(el('span', 'bdg bdg-user', 'Пользовательский'));
+  if (b.gs) bd.append(el('span', 'bdg', 'GS ' + nf(b.gs)));
+  l.append(bd);
+  const sr = el('div', 'stats-row');
+  const statBox = (t, val) => { const x = el('div', 'stat-box'); x.append(el('small', null, t), el('b', null, val)); return x; };
+  sr.append(statBox('Голосов', nf(b.votes || 0))); l.append(sr);
+  const act = el('div', 'actions');
+  let calcHref = '../calc/';
+  if (b.build_json) { try { calcHref = '../calc/#b=' + btoa(unescape(encodeURIComponent(JSON.stringify(b.build_json)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } catch(e) {} }
+  const calcBtn = el('a', 'btn primary', '🧮 Открыть в конструкторе'); calcBtn.href = calcHref;
+  const voteBtn = el('button', 'ghost', '👍 ' + nf(b.votes || 0)); voteBtn.type = 'button';
+  voteBtn.onclick = () => {
+    fetch('../api/vote.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.id }) })
+      .then(r => r.json()).then(d => { voteBtn.textContent = '👍 ' + nf(d.votes); if (d.voted) { voteBtn.disabled = true; toast('Спасибо за голос!'); } else toast('Вы уже голосовали'); })
+      .catch(() => toast('Ошибка соединения'));
+  };
+  const share = el('button', 'ghost', '🔗 Ссылка'); share.type = 'button';
+  share.onclick = () => navigator.clipboard.writeText(location.href).then(() => toast('Ссылка скопирована'), () => prompt('Ссылка:', location.href));
+  act.append(calcBtn, voteBtn, share); l.append(act);
+  const thumb = el('div', 'thumb'); thumb.append(el('div', 'ph', clsName([b.weapon1, b.weapon2])));
+  hero.append(l, thumb); v.append(hero);
+  if (b.description) { const s = section('Описание от автора'); const d = el('div', 'desc'); d.textContent = b.description; s.append(d); v.append(s); }
+  h1.focus({ preventScroll: true });
+}
 function route() {
-  const m = location.hash.match(/^#(\d+)(?:\/(\d+))?/);
-  if (m) return showBuild(m[1], m[2] ? +m[2] - 1 : 0);
-  document.title = 'Каталог билдов';
+  let m;
+  if ((m = location.hash.match(/^#u(\d+)/))) return showUserBuild(+m[1]);
+  if ((m = location.hash.match(/^#(\d+)(?:\/(\d+))?/))) return showBuild(m[1], m[2] ? +m[2] - 1 : 0);
+  document.title = 'Каталог билдов · T2 Билды';
   const wasBuild = !$('#buildView').hidden;
   $('#buildView').hidden = true; $('#listView').hidden = false;
   if (wasBuild) { window.scrollTo(0, lastScroll); const c = lastId && document.querySelector(`.card[data-id="${lastId}"]`); if (c) c.focus({ preventScroll: true }); }
@@ -326,9 +422,22 @@ async function init() {
   if (qp != null) { Object.assign(F, { q: qp, w: [], role: '', mode: '' }); history.replaceState(null, '', location.pathname + location.hash); }
   $('.site-search').addEventListener('submit', e => { e.preventDefault(); F.q = $('#siteQ').value; if (location.hash) location.hash = ''; apply(); $('#grid').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   filtersUI(); viewerUI();
-  const c = await (await fetch('catalog.json')).json();
-  CAT = c.items.map(b => Object.assign(b, { score: b.rt * Math.min(b.rc, 20) + Math.log10(1 + b.v), cls: (clsName(b.w) + ' ' + b.w.join(' ')).toLowerCase() }));
-  $('#built').textContent = `Обновлено ${new Date(c.built).toLocaleDateString('ru-RU')}, билдов: ${nf(CAT.length)}.`;
+  const c = await (await fetch('../api/builds.php')).json();
+  const tlBuilds = c.items.map(b => Object.assign(b, { score: b.rt * Math.min(b.rc, 20) + Math.log10(1 + b.v), cls: (clsName(b.w) + ' ' + b.w.join(' ')).toLowerCase() }));
+  let userBuilds = [];
+  try {
+    const ur = await fetch('../api/user_builds.php?limit=200&sort=votes');
+    const ud = await ur.json();
+    userBuilds = (ud.builds || []).map(function(b) {
+      return { id: 'u' + b.id, _uid: b.id, n: b.name, a: b.author || 'Аноним', w: [b.weapon1, b.weapon2],
+        role: '', mode: '', v: 0, rt: 0, rc: b.votes || 0, gs: b.gs || 0, d: (b.created_at || '').slice(0, 10),
+        img: false, lo: 0, los: [], score: (b.votes || 0) * 2, user: true,
+        cls: (clsName([b.weapon1, b.weapon2]) + ' ' + b.weapon1 + ' ' + b.weapon2).toLowerCase() };
+    });
+  } catch(e) {}
+  CAT = tlBuilds.concat(userBuilds);
+  const totalStr = userBuilds.length ? `, пользовательских: ${nf(userBuilds.length)}` : '';
+  $('#built').textContent = `Обновлено ${new Date(c.built).toLocaleDateString('ru-RU')}, билдов: ${nf(tlBuilds.length)}${totalStr}.`;
   apply();
   window.addEventListener('hashchange', route); route();
 }

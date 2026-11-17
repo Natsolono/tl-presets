@@ -1,5 +1,4 @@
 'use strict';
-/* Конструктор T2-билдов для всех классов. Данные: ../data/ (tl-build.ru + build.tlwg.ru, с разрешения). */
 const DATA = '../data/', IC = '../data/ic/';
 const SLOTS = [
   ['weapon1', 'Основное оружие', 'Weapon'], ['weapon2', 'Второе оружие', 'Weapon'], ['head', 'Шлем', 'Head'], ['chest', 'Нагрудник', 'Chest'],
@@ -25,11 +24,17 @@ const MS_PROC = { WM_Common_SKILL_002: { pct: 2.4, cd: 5, hits: 7, n: 'Небе�
 
 let ITEMS = [], byId = new Map(), SK = [], bySk = new Map(), STAT_KEYS = [];
 let MS = { weapons: {}, common: [] }, msNode = new Map(), msCommon = new Map();
+let VIS = {};
+let AFX_DATA = { slots: [], items: {}, sets: [] };
+let RUNES = {};
+let _afxPickSlot = null;
+let _activeLoadout = 0;
+let _runePickSlot = null, _runePickIdx = -1, _rerenderEditorRunes = null;
 let B = blank();
 
 function blank() {
-  return { v: 2, name: '', w: ['Staff', 'Dagger'], equip: {}, attr: { Str: 10, Dex: 10, Int: 10, Per: 10, Con: 10 }, bonus: [],
-    sk: { a: [], p: [], d: null, lv: {}, sp: {} }, ms: { t: {}, c: [] }, dps: { time: 60, crit: 30, critDmg: 50, heavy: 15 } };
+  return { v: 2, name: '', w: ['Staff', 'Dagger'], equip: {}, afx: {}, attr: { Str: 10, Dex: 10, Int: 10, Per: 10, Con: 10 }, bonus: [],
+    sk: { a: [], p: [], d: null, lv: {}, sp: {} }, ms: { t: {}, c: [] }, dps: { time: 60 } };
 }
 /* старые ссылки калькулятора: {combo:'Dagger'|'Bow'} → посох + это оружие */
 function normalize(o) {
@@ -40,6 +45,7 @@ function normalize(o) {
   delete b.combo; delete b.earSet;
   b.sk = Object.assign({ a: [], p: [], d: null, lv: {}, sp: {} }, b.sk || {});
   b.dps = Object.assign(blank().dps, b.dps || {});
+  if (!b.afx || typeof b.afx !== 'object') b.afx = {};
   b.ms = Object.assign({ t: {}, c: [] }, b.ms || {});
   for (const [wk, nodes] of Object.entries(b.ms.t)) { for (const id of Object.keys(nodes || {})) if (!msNode.has(id)) delete nodes[id]; if (!nodes || !Object.keys(nodes).length) delete b.ms.t[wk]; }
   b.ms.c = (b.ms.c || []).filter(id => msCommon.has(id)).slice(0, MAX_COMMON);
@@ -70,10 +76,34 @@ function compute(b) {
     const g = itemCP(it, e.ench ?? it.mx, (e.traits || []).map(t => t.lvl), e.res != null); if (g != null) { gs += g; gsN++; }
   }
   for (const r of b.bonus) if (r.stat && r.val) add(s, r.stat, toRaw(r.stat, +r.val));
+  // руны в гнёздах снаряжения
+  for (const [slot, e] of Object.entries(b.equip)) {
+    if (!e || !e.runes) continue;
+    for (const runeId of e.runes) {
+      if (!runeId) continue;
+      const rune = RUNES[runeId]; if (!rune || !rune.s) continue;
+      const put = (k, v) => { if (slot === 'weapon2' && WEAPON_ONLY_MAIN.has(k)) return; add(s, k, v); };
+      for (const [k, v] of Object.entries(rune.s)) put(k, v);
+    }
+  }
   const activeSets = [];
   for (const [name, n] of sets) {
     const it = setItem.get(name);
     for (const bn of it.sb) if (bn.p <= n) { for (const [k, v] of Object.entries(bn.s)) add(s, k === 'base_damage' ? 'bonus_attack_power_main_hand' : k, v); activeSets.push({ name, p: bn.p, n, t: bn.t || '', s: bn.s }); }
+  }
+  // артефакты: сетовые бонусы
+  if (AFX_DATA.sets.length) {
+    const afxCnt = new Map();
+    for (const itemId of Object.values(b.afx || {})) {
+      if (!itemId) continue;
+      for (const sd of AFX_DATA.sets) {
+        if (Object.values(sd.items).includes(itemId)) { afxCnt.set(sd.id, (afxCnt.get(sd.id) || 0) + 1); break; }
+      }
+    }
+    for (const [setId, cnt] of afxCnt) {
+      const sd = AFX_DATA.sets.find(s => s.id === setId); if (!sd) continue;
+      for (const bn of sd.b) if (bn.p <= cnt && bn.s) for (const [k, v] of Object.entries(bn.s)) if (v) add(s, k, v);
+    }
   }
   // пассивные умения с бонусами к характеристикам
   for (const id of b.sk.p) { const sk = bySk.get(id); if (sk && sk.st) for (const x of sk.st) add(s, x.key, (x.levels || [])[(b.sk.lv[id] || 15) - 1] ?? x.value); }
@@ -130,9 +160,12 @@ function simulate(R) {
   const mn = (s.bonus_attack_power_main_hand || 0) + 1, mx = (s.attack_power_main_hand || 0) + (s.bonus_attack_power_main_hand || 0);
   if (!R.main) return { err: 'Выберите основное оружие — от него считается базовый урон.' };
   const avg = (mn + mx) / 2;
-  const critDmg = d.critDmg + pct('critical_damage_dealt_modifier', s.critical_damage_dealt_modifier || 0);
-  const wt = WTYPE[B.w[0]] || 'melee'; const typeMod = pct(wt + '_damage_dealt_modifier', s[wt + '_damage_dealt_modifier'] || 0);
-  const mult = (1 + (d.crit / 100) * (critDmg / 100)) * (1 + d.heavy / 100) * (1 + typeMod / 100);
+  const wt = WTYPE[B.w[0]] || 'melee';
+  const crit    = pct(wt + '_critical_attack', s[wt + '_critical_attack'] || 0);
+  const heavy   = pct(wt + '_double_attack',   s[wt + '_double_attack']   || 0);
+  const critDmg = 50 + pct('critical_damage_dealt_modifier', s.critical_damage_dealt_modifier || 0);
+  const typeMod = pct(wt + '_damage_dealt_modifier', s[wt + '_damage_dealt_modifier'] || 0);
+  const mult = (1 + (crit / 100) * (critDmg / 100)) * (1 + heavy / 100) * (1 + typeMod / 100);
   const cdr = 1 + pct('skill_cooldown_modifier', s.skill_cooldown_modifier || 0) / 100;
   const haste = 1 + pct('attack_speed_modifier', s.attack_speed_modifier || 0) / 100;
   const swing = Math.max(0.3, pct('attack_speed_main_hand', s.attack_speed_main_hand || 1000) / haste);
@@ -154,7 +187,7 @@ function simulate(R) {
     if (next - t >= swing || !list.length) { auto += avg * mult; autoN++; onHit(false); t += swing; } else t = next;
   }
   const total = list.reduce((a, x) => a + x.total, 0) + auto + procs.reduce((a, p) => a + p.total, 0);
-  return { T, total, dps: total / T, list, auto, autoN, avg, swing, cdr, critDmg, typeMod, wt, procs, skipped: B.sk.a.filter(id => { const sk = bySk.get(id); return sk && sk.cat !== 'Basic' && !list.find(x => x.id === id); }).length };
+  return { T, total, dps: total / T, list, auto, autoN, avg, swing, cdr, crit, heavy, critDmg, typeMod, wt, procs, skipped: B.sk.a.filter(id => { const sk = bySk.get(id); return sk && sk.cat !== 'Basic' && !list.find(x => x.id === id); }).length };
 }
 
 /* ---------- отрисовка: слоты ---------- */
@@ -215,9 +248,13 @@ function renderDps(R) {
   const out = $('#dpsOut'); out.innerHTML = ''; const r = simulate(R);
   if (r.err) { out.append(el('p', 'hint', r.err)); $('#dpsVal').textContent = '—'; return; }
   $('#dpsVal').textContent = nf(Math.round(r.dps)) + ' / с';
-  out.append(kv('Урон за ' + r.T + ' с', nf(Math.round(r.total))), kv('Средний базовый урон', nf(Math.round(r.avg))), kv('Перезарядка умений', '÷ ' + r.cdr.toFixed(2)), kv('Автоатака раз в', r.swing.toFixed(2) + ' с'),
-    kv('Крит. урон с учётом снаряжения и мастерства', Math.round(r.critDmg * 10) / 10 + '%'));
-  if (r.typeMod) out.append(kv('Урон (' + ({ melee: 'ближний бой', range: 'дальний бой', magic: 'магия' })[r.wt] + ')', (r.typeMod > 0 ? '+' : '') + Math.round(r.typeMod * 10) / 10 + '%'));
+  const wtLabel = ({ melee: 'ближний бой', range: 'дальний бой', magic: 'магия' })[r.wt] || r.wt;
+  out.append(kv('Урон за ' + r.T + ' с', nf(Math.round(r.total))), kv('Средний базовый урон', nf(Math.round(r.avg))),
+    kv('Шанс крита (' + wtLabel + ')', Math.round(r.crit * 10) / 10 + '%'),
+    kv('Шанс мощной атаки (' + wtLabel + ')', Math.round(r.heavy * 10) / 10 + '%'),
+    kv('Крит. урон', Math.round(r.critDmg * 10) / 10 + '%'),
+    kv('Перезарядка умений', '÷ ' + r.cdr.toFixed(2)), kv('Автоатака раз в', r.swing.toFixed(2) + ' с'));
+  if (r.typeMod) out.append(kv('Урон (' + wtLabel + ')', (r.typeMod > 0 ? '+' : '') + Math.round(r.typeMod * 10) / 10 + '%'));
   const rows = [...r.list.filter(x => x.casts).sort((a, b) => b.total - a.total).map(x => [x.n, x.casts, x.total]), ...r.procs.filter(p => p.casts).map(p => [p.n + ' (мастерство)', p.casts, p.total]), ['Автоатаки', r.autoN, r.auto]];
   const tb = el('table', 'dps-t'); const th = el('tr'); ['Источник', 'Раз', 'Доля'].forEach(t => th.append(el('th', null, t))); const thead = el('thead'); thead.append(th); tb.append(thead);
   const tbody = el('tbody'); rows.forEach(([n, c, t]) => { const tr = el('tr'); tr.append(el('td', null, n), el('td', null, String(c)), el('td', null, r.total ? Math.round(t / r.total * 100) + '%' : '—')); tbody.append(tr); }); tb.append(tbody);
@@ -296,64 +333,161 @@ function setNode(wk, n, lv) {
   if (!Object.keys(tree).length) delete B.ms.t[wk];
   update(false); renderMastery();
 }
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs) {
+  const e = document.createElementNS(SVG_NS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
+function makeMasteryTree(wk, tr) {
+  const vis = VIS[wk] || {};
+  const wrap = el('div', 'ms-svgtree');
+
+  /* header */
+  const h = el('div', 'ms-svgtree-h');
+  h.append(icon(IC, tr.ic, tr.n, 'sm'), el('b', null, tr.n), el('span', 'pill', `${msUsed(wk)} / ${MS_CAP}`));
+  const clr = el('button', 'ghost', 'Сбросить'); clr.type = 'button';
+  clr.onclick = () => { delete B.ms.t[wk]; update(false); renderMastery(); };
+  h.append(clr);
+  wrap.append(h);
+
+  /* SVG */
+  const svg = svgEl('svg', { viewBox: '0 0 100 100', class: 'ms-svg', role: 'img', 'aria-label': 'Дерево мастерства ' + tr.n });
+
+  /* defs: glow filter */
+  const defs = svgEl('defs');
+  const filt = svgEl('filter', { id: 'msglow-' + wk, x: '-40%', y: '-40%', width: '180%', height: '180%' });
+  const fblur = svgEl('feGaussianBlur', { stdDeviation: '1.2', result: 'blur' });
+  const fcmp = svgEl('feComposite', { in: 'SourceGraphic', in2: 'blur', operator: 'over' });
+  filt.append(fblur, fcmp); defs.append(filt); svg.append(defs);
+
+  /* background */
+  svg.append(svgEl('circle', { cx: 50, cy: 50, r: 50, fill: '#080e1a' }));
+  /* ring gradients */
+  for (const [r, op] of [[48, 0.5], [42, 0.3], [32, 0.25], [21, 0.2]]) {
+    svg.append(svgEl('circle', { cx: 50, cy: 50, r, fill: 'none', stroke: '#2a3f5f', 'stroke-width': r === 48 ? '0.6' : '0.3', opacity: op }));
+  }
+
+  /* links */
+  for (const [from, to, color, pts] of (vis.links || [])) {
+    if (!pts || pts.length < 2) continue;
+    svg.append(svgEl('path', {
+      d: 'M' + pts.map(p => `${p[0]},${p[1]}`).join('L'),
+      stroke: color, 'stroke-width': '0.55', fill: 'none', opacity: '0.3'
+    }));
+  }
+
+  /* center weapon icon */
+  svg.append(svgEl('circle', { cx: 50, cy: 50, r: 7.5, fill: '#0d1830', stroke: '#c89a2a', 'stroke-width': '1.2' }));
+  if (tr.ic) {
+    const img = svgEl('image', { href: IC + tr.ic, x: 44, y: 44, width: 12, height: 12 });
+    svg.append(img);
+  }
+
+  /* nodes */
+  const nodeVis = vis.nodes || {};
+  for (const n of tr.nodes) {
+    const lv = (B.ms.t[wk] || {})[n.id] || 0;
+    const nv = nodeVis[n.id] || {};
+    const color = nv.co || '#7a8ea8';
+    const sh = nv.sh || 'c';
+    const active = lv > 0;
+    const isHero = n.id.includes('_Hero_');
+    const size = isHero ? 3.8 : (sh !== 'c') ? 2.9 : 2.3;
+    const fill = active ? color : '#121d2e';
+    const stroke = active ? color : '#2d3f54';
+    const filtAttr = active ? { filter: `url(#msglow-${wk})` } : {};
+
+    const g = svgEl('g', { class: 'ms-node' + (active ? ' on' : ''), 'data-id': n.id });
+    g.style.cursor = 'pointer';
+
+    /* visual shape */
+    let vis_el;
+    if (sh === 'd') {
+      vis_el = svgEl('rect', { x: n.x - size, y: n.y - size, width: size * 2, height: size * 2,
+        transform: `rotate(45,${n.x},${n.y})`, fill, stroke, 'stroke-width': '0.5', ...filtAttr });
+    } else if (sh === 's') {
+      vis_el = svgEl('rect', { x: n.x - size, y: n.y - size, width: size * 2, height: size * 2,
+        fill, stroke, 'stroke-width': '0.5', ...filtAttr });
+    } else {
+      vis_el = svgEl('circle', { cx: n.x, cy: n.y, r: size, fill, stroke, 'stroke-width': '0.5', ...filtAttr });
+    }
+    g.append(vis_el);
+
+    /* level badge */
+    if (n.max > 1) {
+      const txt = svgEl('text', { x: n.x, y: n.y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        'font-size': '2', 'font-weight': '700', fill: active ? '#fff' : '#3a4f65', 'pointer-events': 'none' });
+      txt.textContent = active ? String(lv) : '';
+      g.append(txt);
+    }
+
+    /* transparent hit zone (easier to click) */
+    const hit = svgEl('circle', { cx: n.x, cy: n.y, r: Math.max(5, size + 2.5), fill: 'transparent', stroke: 'none' });
+    g.append(hit);
+
+    /* tooltip */
+    const title = svgEl('title');
+    const st = msStatText(n, lv || 1);
+    title.textContent = n.n.replace(/^\[[^\]]+\]\s*/, '') + ` ${lv}/${n.max}` + (st ? '\n' + st : '') + (n.t ? '\n' + n.t.split('\n')[0].slice(0, 120) : '');
+    g.append(title);
+
+    /* interactions */
+    g.addEventListener('click', () => setNode(wk, n, lv >= n.max ? 0 : lv + 1));
+    g.addEventListener('contextmenu', e => { e.preventDefault(); setNode(wk, n, Math.max(0, lv - 1)); });
+
+    svg.append(g);
+  }
+
+  wrap.append(svg);
+
+  /* per-tree stats summary */
+  const sum = {};
+  for (const [id, lv] of Object.entries(B.ms.t[wk] || {})) {
+    const nd = msNode.get(id); const L = nd && nd.lv && nd.lv[lv - 1];
+    if (L) for (const x of L.stats || []) sum[x.stat] = (sum[x.stat] || 0) + x.value;
+  }
+  const keys = Object.keys(sum).filter(k => sum[k]);
+  if (keys.length) {
+    const det = el('details', 'ms-treesum'); det.append(el('summary', null, 'Что даёт мастерство'));
+    keys.sort((a, b) => lab(a).localeCompare(lab(b), 'ru')).forEach(k => det.append(kv(lab(k), signed(k, sum[k]))));
+    wrap.append(det);
+  }
+
+  return wrap;
+}
+
 function renderMastery() {
   const box = $('#mastery'); if (!box) return;
-  const open = new Set([...box.querySelectorAll('details[open]')].map(d => d.dataset.k));
-  const first = !box.childElementCount; box.innerHTML = '';
+  box.innerHTML = '';
   $('#msPts').textContent = B.w.map(w => `${W_RU[w]} ${msUsed(MS_KEY[w])}/${MS_CAP}`).join(' · ');
-  const keepOpen = (d, k, def) => { d.dataset.k = k; d.open = first ? def : open.has(k); };
+
+  /* weapon SVG trees */
+  const trees = el('div', 'ms-trees');
   for (const w of B.w) {
     const wk = MS_KEY[w]; const tr = MS.weapons[wk]; if (!tr) continue;
-    const det = el('details', 'ms-tree'); keepOpen(det, wk, w === B.w[0] || !!msUsed(wk));
-    const sm = el('summary'); sm.append(icon(IC, tr.ic, '', 'sm'), el('b', null, tr.n), el('span', 'pill', `${msUsed(wk)} / ${MS_CAP}`)); det.append(sm);
-    const tools = el('div', 'row-actions ms-tools');
-    const clr = el('button', 'text', 'Сбросить дерево'); clr.type = 'button'; clr.onclick = () => { delete B.ms.t[wk]; update(false); renderMastery(); };
-    tools.append(clr); det.append(tools);
-    for (const [tier, title] of MS_TIER) {
-      const nodes = tr.nodes.filter(n => n.id.split('_')[1] === tier); if (!nodes.length) continue;
-      const sec = el('div', 'ms-tier'); sec.append(el('h3', null, title));
-      const grid = el('div', 'ms-grid');
-      nodes.slice().sort((a, b) => (a.type === 'synergy') - (b.type === 'synergy') || a.cat.localeCompare(b.cat, 'ru')).forEach(n => {
-        const lv = (B.ms.t[wk] || {})[n.id] || 0; const card = el('div', 'msn' + (lv ? ' on' : '') + (n.type === 'synergy' ? ' syn' : ''));
-        const h = el('div', 'msn-h'); h.append(icon(IC, n.ic, '', 'sm'));
-        const tt = el('div', 'msn-t'); tt.append(el('b', null, n.n.replace(/^\[[^\]]+\]\s*/, '')), el('small', null, [n.type === 'synergy' ? 'Синергия' : msTag(n), n.cat].filter(Boolean).join(' · ')));
-        h.append(tt); card.append(h);
-        if (n.type === 'synergy') {
-          const tg = el('button', 'sp-chip', lv ? 'Взято' : 'Взять'); tg.type = 'button'; tg.setAttribute('aria-pressed', !!lv); tg.setAttribute('aria-label', (lv ? 'Убрать: ' : 'Взять: ') + n.n);
-          tg.onclick = () => setNode(wk, n, lv ? 0 : 1); card.append(tg);
-          const d = el('details', 'sk-d'); d.append(el('summary', null, 'Описание'), el('p', null, n.t || '')); card.append(d);
-        } else {
-          const ctl = el('div', 'msn-ctl');
-          const minus = el('button', 'ghost', '−'); minus.type = 'button'; minus.disabled = !lv; minus.setAttribute('aria-label', 'Убавить: ' + n.n); minus.onclick = () => setNode(wk, n, lv - 1);
-          const val = el('b', null, `${lv}/${n.max}`);
-          const plus = el('button', 'ghost', '+'); plus.type = 'button'; plus.disabled = lv >= n.max; plus.setAttribute('aria-label', 'Прибавить: ' + n.n); plus.onclick = () => setNode(wk, n, lv + 1);
-          const mx = el('button', 'text', 'макс.'); mx.type = 'button'; mx.disabled = lv >= n.max; mx.setAttribute('aria-label', 'Максимум: ' + n.n); mx.onclick = () => setNode(wk, n, Math.min(n.max, lv + MS_CAP - msUsed(wk)));
-          ctl.append(minus, val, plus, mx); card.append(ctl);
-          const st = msStatText(n, lv || 1); card.append(el('p', 'msn-s', st ? (lv ? '' : 'за 1 ур.: ') + st : (n.t || '').split(/\r?\n/)[0]));
-        }
-        grid.append(card);
-      });
-      sec.append(grid); det.append(sec);
-    }
-    box.append(det);
+    trees.append(makeMasteryTree(wk, tr));
   }
-  const det = el('details', 'ms-tree'); keepOpen(det, 'common', !!B.ms.c.length);
+  box.append(trees);
+
+  /* common mastery */
+  const det = el('details', 'ms-tree');
   const sm = el('summary'); sm.append(el('b', null, 'Общие умения мастерства'), el('span', 'pill', `${B.ms.c.length} / ${MAX_COMMON}`)); det.append(sm);
-  det.append(el('p', 'hint', `До ${MAX_COMMON} умений. Уровень мастерства, на котором открывается умение, указан для справки и не проверяется.`));
+  det.append(el('p', 'hint', `До ${MAX_COMMON} умений. Уровень, на котором открывается умение, указан для справки.`));
   const grid = el('div', 'ms-grid');
   MS.common.forEach(c => {
     const on = B.ms.c.includes(c.id); const card = el('div', 'msn' + (on ? ' on' : ''));
-    const h = el('div', 'msn-h'); h.append(icon(IC, c.ic, '', 'sm')); const tt = el('div', 'msn-t'); tt.append(el('b', null, c.n), el('small', null, `открывается на ${c.req} ур.${MS_PROC[c.id] ? ' · учитывается в DPS' : c.id === 'WM_Common_SKILL_007' ? ' · учитывается в статах' : ''}`)); h.append(tt); card.append(h);
-    const tg = el('button', 'sp-chip', on ? 'Взято' : 'Взять'); tg.type = 'button'; tg.setAttribute('aria-pressed', on); tg.setAttribute('aria-label', (on ? 'Убрать: ' : 'Взять: ') + c.n);
+    const h = el('div', 'msn-h'); h.append(icon(IC, c.ic, '', 'sm'));
+    const tt = el('div', 'msn-t'); tt.append(el('b', null, c.n), el('small', null, `открывается на ${c.req} ур.${MS_PROC[c.id] ? ' · учитывается в DPS' : c.id === 'WM_Common_SKILL_007' ? ' · учитывается в статах' : ''}`));
+    h.append(tt); card.append(h);
+    const tg = el('button', 'sp-chip', on ? 'Взято' : 'Взять'); tg.type = 'button'; tg.setAttribute('aria-pressed', on);
     tg.onclick = () => { if (on) B.ms.c = B.ms.c.filter(x => x !== c.id); else { if (B.ms.c.length >= MAX_COMMON) return toast(`Не больше ${MAX_COMMON}: сначала уберите другое`); B.ms.c.push(c.id); } update(false); renderMastery(); };
     card.append(tg);
     const d = el('details', 'sk-d'); d.append(el('summary', null, 'Описание'), el('p', null, c.t || '')); card.append(d);
     grid.append(card);
   });
   det.append(grid); box.append(det);
-  const sum = {}; for (const w of B.w) for (const [id, lv] of Object.entries(B.ms.t[MS_KEY[w]] || {})) { const n = msNode.get(id); const L = n && n.lv && n.lv[lv - 1]; if (L) for (const x of L.stats || []) sum[x.stat] = (sum[x.stat] || 0) + x.value; }
-  const keys = Object.keys(sum).filter(k => sum[k]);
-  if (keys.length) { const t = el('details', 'all'); keepOpen(t, 'sum', false); t.append(el('summary', null, 'Что даёт мастерство')); keys.sort((a, b) => lab(a).localeCompare(lab(b), 'ru')).forEach(k => t.append(kv(lab(k), signed(k, sum[k])))); box.append(t); }
 }
 
 /* ---------- выбор и настройка предметов ---------- */
@@ -426,7 +560,37 @@ function openEditor(slot) {
     body.append(sec);
   }
   if (it.perk) { const sec = el('div', 'ed-sec'); sec.append(el('h3', null, 'Особое умение: ' + (it.perk.n || ''))); sec.append(el('div', 'ed-stats', it.perk.d || '')); body.append(sec); }
-  if (it.rs) body.append(el('p', 'hint', `Гнёзд для рун: ${it.rs}. Бонусы рун добавьте в «Доп. бонусах».`));
+  if (it.rs > 0) {
+    if (!e.runes || !Array.isArray(e.runes) || e.runes.length !== it.rs) e.runes = Array(it.rs).fill(null);
+    const runesSec = el('div', 'ed-sec');
+    _rerenderEditorRunes = () => {
+      runesSec.innerHTML = '';
+      const det = el('details', 'rune-det'); det.open = true;
+      const sm = el('summary'); sm.append(el('b', null, 'Руны'), el('span', 'pill', `${e.runes.filter(Boolean).length} / ${it.rs}`)); det.append(sm);
+      const rows = el('div', 'rune-rows');
+      for (let i = 0; i < it.rs; i++) {
+        const runeId = e.runes[i]; const rune = runeId ? RUNES[runeId] : null;
+        const row = el('div', 'rune-row');
+        const btn = el('button', 'rune-btn ghost', ''); btn.type = 'button';
+        if (rune) {
+          btn.append(el('span', 'rune-name g-' + rune.g, rune.n));
+          const stats = Object.entries(rune.s).map(([k, v]) => lab(k) + ' ' + fmtVal(k, v)).join(', ');
+          btn.append(el('span', 'rune-stats', stats));
+          const rm = el('button', 'ghost danger rune-rm', '×'); rm.type = 'button'; rm.setAttribute('aria-label', 'Снять руну');
+          rm.onclick = ev => { ev.stopPropagation(); e.runes[i] = null; update(false); _rerenderEditorRunes(); };
+          row.append(btn, rm);
+        } else {
+          btn.append(el('span', 'rune-empty', `Гнездо ${i + 1} · выбрать руну`));
+          row.append(btn);
+        }
+        btn.onclick = () => openRunePicker(it, i);
+        rows.append(row);
+      }
+      det.append(rows); runesSec.append(det);
+    };
+    _rerenderEditorRunes();
+    body.append(runesSec);
+  }
   const more = el('a', 'text-link', 'Подробнее в энциклопедии →'); more.href = '../db/#item/' + encodeURIComponent(it.id); more.target = '_blank'; body.append(more);
   $('#editor').showModal();
 }
@@ -448,12 +612,167 @@ function renderBonuses() {
 }
 
 /* ---------- состояние, ссылки, экспорт ---------- */
-function save() { store.set('t2calc-current', B); }
+function save() { store.set('t2calc-current', B); saveLoadout(); }
 function update(full = true) {
   const R = compute(B);
-  if (full) { renderSlots(); renderBonuses(); }
+  if (full) { renderSlots(); renderBonuses(); renderArtifacts(); }
   renderAttrs(R); renderSummary(R); renderDps(R); save();
   if (!full) renderSlots();
+}
+/* ---------- артефакты ---------- */
+function renderArtifacts() {
+  const box = $('#afxSlots'); if (!box) return;
+  box.innerHTML = '';
+  const slotOrder = ['gemstone1','gemstone2','talistone1','talistone2','talistone3','talistone4'];
+  const slotLabel = { gemstone1:'Соларит', gemstone2:'Лунарит', talistone1:'Талирит I', talistone2:'Талирит II', talistone3:'Талирит III', talistone4:'Талирит IV' };
+  const slotIcon = { gemstone1:'☀', gemstone2:'☽', talistone1:'◆', talistone2:'◆', talistone3:'◆', talistone4:'◆' };
+  for (const slotId of slotOrder) {
+    const itemId = B.afx[slotId] || null;
+    const item = itemId ? AFX_DATA.items[itemId] : null;
+    const btn = el('button', 'afx-slot ghost', '');
+    btn.type = 'button';
+    const ico = el('span', 'afx-ico');
+    if (item) {
+      const img = el('img'); img.loading = 'lazy'; img.alt = ''; img.src = IC + item.ic;
+      img.onerror = () => { ico.textContent = slotIcon[slotId]; };
+      ico.append(img);
+    } else { ico.textContent = slotIcon[slotId]; }
+    const info = el('div', 'afx-info');
+    info.append(el('span', 'afx-name', item ? item.n : slotLabel[slotId]));
+    if (item) { const grade = el('span', 'g-' + item.g); grade.textContent = GRADE_RU[item.g] || item.g; info.append(grade); }
+    else { info.append(el('span', 'afx-empty', '(пусто)')); }
+    btn.append(ico, info);
+    if (item) {
+      const rm = el('button', 'ghost afx-rm', '×'); rm.type = 'button'; rm.setAttribute('aria-label', 'Снять');
+      rm.onclick = e => { e.stopPropagation(); B.afx[slotId] = null; update(); };
+      btn.append(rm);
+    }
+    btn.onclick = () => openAfxPicker(slotId, slotLabel[slotId]);
+    box.append(btn);
+  }
+  // активные сетовые бонусы и итоговые статы артефактов
+  const setBox = $('#afxSets'); if (!setBox) return;
+  setBox.innerHTML = '';
+  const afxCnt = new Map();
+  for (const itemId of Object.values(B.afx || {})) {
+    if (!itemId) continue;
+    for (const sd of AFX_DATA.sets) {
+      if (Object.values(sd.items).includes(itemId)) { afxCnt.set(sd.id, (afxCnt.get(sd.id) || 0) + 1); break; }
+    }
+  }
+  if (!afxCnt.size) return;
+  // суммарные статы от артефактных сетов (как "Что даёт мастерство")
+  const afxStats = {};
+  for (const [setId, cnt] of afxCnt) {
+    const sd = AFX_DATA.sets.find(s => s.id === setId); if (!sd) continue;
+    for (const bn of sd.b) if (bn.p <= cnt && bn.s) for (const [k, v] of Object.entries(bn.s)) if (v) afxStats[k] = (afxStats[k] || 0) + v;
+  }
+  const statKeys = Object.keys(afxStats).filter(k => afxStats[k]);
+  if (statKeys.length) {
+    const det = el('details', 'afx-statdet'); det.open = true;
+    det.append(el('summary', null, 'Что дают артефакты'));
+    statKeys.sort((a, b) => lab(a).localeCompare(lab(b), 'ru')).forEach(k => det.append(kv(lab(k), fmtVal(k, afxStats[k]))));
+    setBox.append(det);
+  }
+  // бонусы сетов с разбивкой
+  for (const [setId, cnt] of afxCnt) {
+    const sd = AFX_DATA.sets.find(s => s.id === setId); if (!sd) continue;
+    const det = el('details', 'afx-setdet'); det.open = true;
+    const sm = el('summary'); sm.append(el('b', null, sd.n), el('span', 'pill', `${cnt} / 6`)); det.append(sm);
+    for (const bn of sd.b) {
+      const cls = bn.p <= cnt ? 'afx-bn-active' : 'afx-bn-locked';
+      const text = (bn.n || `${bn.p} шт.`) + (bn.t ? ': ' + bn.t : (bn.s ? ': ' + Object.entries(bn.s).map(([k,v]) => lab(k) + ' ' + fmtVal(k,v)).join(', ') : ''));
+      det.append(el('div', cls, text));
+    }
+    setBox.append(det);
+  }
+}
+function openAfxPicker(slotId, label) {
+  _afxPickSlot = slotId;
+  const dlg = $('#afxPicker'); if (!dlg) return;
+  dlg.querySelector('#afxPickTitle').textContent = 'Выбрать: ' + label;
+  $('#afxPickSearch').value = '';
+  renderAfxPick();
+  dlg.showModal();
+}
+function renderAfxPick() {
+  const slotId = _afxPickSlot; if (!slotId) return;
+  const q = ($('#afxPickSearch').value || '').toLowerCase();
+  const list = $('#afxPickList'); list.innerHTML = '';
+  const entries = Object.entries(AFX_DATA.items).filter(([, it]) => it.slot === slotId);
+  const filtered = q ? entries.filter(([, it]) => it.n.toLowerCase().includes(q)) : entries;
+  if (!filtered.length) { list.append(el('p', 'hint', 'Ничего не найдено')); return; }
+  for (const [id, it] of filtered) {
+    const btn = el('button', 'pick-item' + (B.afx[slotId] === id ? ' active' : ''), '');
+    btn.type = 'button';
+    const img = el('img', 'ic'); img.loading = 'lazy'; img.alt = ''; img.src = IC + it.ic;
+    img.onerror = () => { img.style.display = 'none'; };
+    const nameEl = el('span', 'pick-n', it.n);
+    const gradeEl = el('span', 'g-' + it.g, GRADE_RU[it.g] || it.g);
+    const info = el('span', 'pick-meta'); info.append(nameEl, el('br'), gradeEl);
+    btn.append(img, info);
+    btn.onclick = () => { B.afx[slotId] = id; update(); $('#afxPicker').close(); };
+    list.append(btn);
+  }
+}
+/* ---------- руны ---------- */
+function openRunePicker(it, idx) {
+  _runePickSlot = it; // it object (not slot key)
+  _runePickIdx = idx;
+  $('#runePickSearch').value = '';
+  $('#runePickCat').value = '';
+  renderRunePick();
+  $('#runePicker').showModal();
+}
+function renderRunePick() {
+  const q = ($('#runePickSearch').value || '').toLowerCase();
+  const cat = ($('#runePickCat').value || '');
+  const list = $('#runePickList'); list.innerHTML = '';
+  let entries = Object.values(RUNES);
+  if (cat) entries = entries.filter(r => r.cat === cat);
+  if (q) entries = entries.filter(r => r.n.toLowerCase().includes(q) || r.cat.toLowerCase().includes(q));
+  entries.sort((a, b) => GRADE_ORDER.indexOf(b.g) - GRADE_ORDER.indexOf(a.g) || a.n.localeCompare(b.n, 'ru'));
+  if (!entries.length) { list.append(el('p', 'hint', 'Ничего не найдено')); return; }
+  const e = _runePickSlot ? B.equip[edSlot] : null;
+  const curRuneId = e && e.runes ? e.runes[_runePickIdx] : null;
+  for (const rune of entries) {
+    const btn = el('button', 'pick-item' + (curRuneId === rune.id ? ' active' : ''), ''); btn.type = 'button';
+    const nameEl = el('span', 'pick-n g-' + rune.g, rune.n);
+    const catEl = el('span', 'pick-meta', GRADE_RU[rune.g] || rune.g);
+    const stats = Object.entries(rune.s).map(([k, v]) => lab(k) + ' ' + fmtVal(k, v)).join(', ');
+    const statsEl = el('span', 'pick-meta', stats);
+    const info = el('span', 'pick-info'); info.append(nameEl, el('span', null, ' · '), catEl, el('br'), statsEl);
+    btn.append(info);
+    btn.onclick = () => {
+      if (e && e.runes) e.runes[_runePickIdx] = rune.id;
+      update(false);
+      if (_rerenderEditorRunes) _rerenderEditorRunes();
+      $('#runePicker').close();
+    };
+    list.append(btn);
+  }
+}
+/* ---------- лоадауты ---------- */
+function saveLoadout() {
+  const all = store.get('t2calc-loadouts', [null, null, null]);
+  while (all.length < 3) all.push(null);
+  all[_activeLoadout] = JSON.parse(JSON.stringify(B));
+  store.set('t2calc-loadouts', all);
+}
+function loadLoadout(idx) {
+  saveLoadout();
+  _activeLoadout = idx;
+  store.set('t2calc-active-loadout', idx);
+  const all = store.get('t2calc-loadouts', [null, null, null]);
+  const lo = all[idx];
+  if (lo) load(lo); else load(blank());
+  renderLoadoutTabs();
+}
+function renderLoadoutTabs() {
+  const bar = $('#loadoutBar'); if (!bar) return;
+  $$('.loadout-btn', bar).forEach((btn, i) => {
+    btn.classList.toggle('active', i === _activeLoadout);
+  });
 }
 function enc(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function dec(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); return JSON.parse(decodeURIComponent(escape(atob(s)))); }
@@ -461,7 +780,7 @@ const shareUrl = () => location.origin + location.pathname + '#b=' + enc(B);
 function load(o) {
   B = normalize(o);
   fillWeapons(); $('#buildName').value = B.name || '';
-  ['time', 'crit', 'critDmg', 'heavy'].forEach(k => { $('#d' + k[0].toUpperCase() + k.slice(1)).value = B.dps[k]; });
+  $('#dTime').value = B.dps.time ?? 60;
   update(); renderSkills(); renderMastery();
 }
 function fillWeapons() {
@@ -499,9 +818,19 @@ function renderSaved() {
 
 async function init() {
   await loadMeta(DATA);
-  const [items, skills, ms] = await Promise.all([fetch(DATA + 'items.json').then(r => r.json()), fetch(DATA + 'skills.json').then(r => r.json()), fetch(DATA + 'mastery.json').then(r => r.json()).catch(() => null)]);
+  const [items, skills, ms, msVis, afx, rns] = await Promise.all([
+    fetch(DATA + 'items.json').then(r => r.json()),
+    fetch(DATA + 'skills.json').then(r => r.json()),
+    fetch(DATA + 'mastery.json').then(r => r.json()).catch(() => null),
+    fetch(DATA + 'mastery-vis.json').then(r => r.json()).catch(() => null),
+    fetch(DATA + 'artifacts.json').then(r => r.json()).catch(() => null),
+    fetch(DATA + 'runes.json').then(r => r.json()).catch(() => null)
+  ]);
   ITEMS = items; SK = skills;
   if (ms) { MS = ms; for (const tr of Object.values(MS.weapons)) for (const n of tr.nodes) msNode.set(n.id, n); MS.common.forEach(c => msCommon.set(c.id, c)); }
+  if (msVis) VIS = msVis;
+  if (afx) AFX_DATA = afx;
+  if (rns) RUNES = rns;
   ITEMS.forEach(it => { byId.set(it.id, it); it._gs = itemCP(it, it.mx, [], false); it._q = [it.n, it.set || '', ...Object.keys({ ...it.b, ...it.x }).map(lab), ...it.tr.map(t => lab((META.traits[t] || {}).s))].join(' ').toLowerCase(); });
   SK.forEach(s => bySk.set(s.id, s));
   STAT_KEYS = Object.keys(META.labels).filter(k => !/^(adjust_|gathering_|dash_|glide_|swim_|earn_|spend_|additional_|pv_p_|aggro_|aura_|polymorph_)/.test(k)).filter(k => !/_immune$/.test(k)).sort((a, b) => lab(a).localeCompare(lab(b), 'ru'));
@@ -516,16 +845,65 @@ async function init() {
   $('#addBonus').onclick = () => { B.bonus.push({ src: 'Руна', stat: '', val: '' }); update(); };
   $('#saveBtn').onclick = () => { const list = store.get('t2calc-saved', []); const name = B.name || prompt('Название сборки:', 'Мой билд'); if (!name) return; B.name = name; $('#buildName').value = name; list.push(JSON.parse(JSON.stringify(B))); store.set('t2calc-saved', list); renderSaved(); toast('Сохранено'); };
   $('#shareBtn').onclick = () => { const u = shareUrl(); navigator.clipboard.writeText(u).then(() => toast('Ссылка скопирована'), () => prompt('Ссылка на сборку:', u)); };
+  if ($('#publishBtn')) {
+    $('#publishBtn').onclick = () => {
+      const dlg = $('#publishDlg');
+      $('#pubName').value = B.name || '';
+      $('#pubAuthor').value = '';
+      $('#pubStatus').textContent = '';
+      dlg.showModal();
+    };
+    $('#pubOkBtn').onclick = () => {
+      const name = $('#pubName').value.trim();
+      if (!name) { $('#pubStatus').textContent = 'Введите название билда'; return; }
+      const gs = compute(B).gs || 0;
+      const payload = {
+        name: name,
+        description: $('#pubDesc').value.trim(),
+        author: $('#pubAuthor').value.trim() || 'Аноним',
+        weapon1: B.w[0],
+        weapon2: B.w[1],
+        build_json: B,
+        gs: Math.round(gs)
+      };
+      $('#pubOkBtn').disabled = true;
+      $('#pubStatus').textContent = 'Публикуется…';
+      fetch('../api/user_builds.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            $('#pubStatus').innerHTML = 'Опубликовано! <a href="../builds/?user=1" target="_blank">Открыть в каталоге</a>';
+            $('#pubOkBtn').disabled = false;
+          } else {
+            $('#pubStatus').textContent = 'Ошибка: ' + (data.error || 'неизвестная ошибка');
+            $('#pubOkBtn').disabled = false;
+          }
+        })
+        .catch(() => { $('#pubStatus').textContent = 'Ошибка соединения'; $('#pubOkBtn').disabled = false; });
+    };
+  }
   $('#exportBtn').onclick = () => { const u = shareUrl(); $('#exText').value = exportText(); $('#exLink').value = u; $('#exEmbed').value = `<iframe src="${u}" width="100%" height="900" style="border:0" title="${(B.name || 'Билд').replace(/"/g, '')} — конструктор T2-билдов" loading="lazy"></iframe>`; $('#exportDlg').showModal(); };
   $('#exCopyText').onclick = () => navigator.clipboard.writeText($('#exText').value).then(() => toast('Текст скопирован'));
   $('#exCopyEmbed').onclick = () => navigator.clipboard.writeText($('#exEmbed').value).then(() => toast('Код скопирован'));
   $('#pickSearch').oninput = renderPick; $('#pickGrade').onchange = renderPick;
-  [['#dTime', 'time'], ['#dCrit', 'crit'], ['#dCritDmg', 'critDmg'], ['#dHeavy', 'heavy']].forEach(([s, k]) => { $(s).oninput = e => { B.dps[k] = +e.target.value || 0; renderDps(compute(B)); save(); }; });
+  if ($('#afxPickSearch')) { $('#afxPickSearch').oninput = renderAfxPick; }
+  if ($('#afxPicker')) { $('#afxPicker').addEventListener('close', () => { _afxPickSlot = null; }); }
+  if ($('#runePicker')) {
+    $('#runePicker').addEventListener('close', () => { _runePickSlot = null; _runePickIdx = -1; });
+    $('#runePickSearch').oninput = renderRunePick;
+    $('#runePickCat').onchange = renderRunePick;
+  }
+  // лоадауты
+  _activeLoadout = store.get('t2calc-active-loadout', 0);
+  $$('.loadout-btn').forEach((btn, i) => { btn.onclick = () => loadLoadout(i); });
+  [['#dTime', 'time']].forEach(([s, k]) => { $(s).oninput = e => { B.dps[k] = +e.target.value || 0; renderDps(compute(B)); save(); }; });
   const h = location.hash.match(/#b=(.+)/);
   if (h) { try { load(dec(h[1])); history.replaceState(null, '', location.pathname); renderSaved(); return; } catch (e) { toast('Не удалось открыть ссылку'); } }
-  const cur = store.get('t2calc-current', null);
+  const all = store.get('t2calc-loadouts', [null, null, null]);
+  const cur = all[_activeLoadout] || store.get('t2calc-current', null);
   if (cur) load(cur); else if (presets[0]) load(presets[0]); else load(blank());
   renderSaved();
+  renderLoadoutTabs();
 }
 function pruneSkills() {
   const ok = id => { const s = bySk.get(id); return s && B.w.includes(s.w); };

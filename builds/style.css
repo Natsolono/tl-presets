@@ -35,6 +35,7 @@
 .bdg.r-tank{color:var(--g-Rare2);border-color:color-mix(in srgb,var(--g-Rare2) 45%,transparent)}
 .bdg.r-support{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent)}
 .bdg.calc{color:var(--acc);border-color:var(--acc)}
+.bdg.bdg-user{color:var(--g-Epic);border-color:color-mix(in srgb,var(--g-Epic) 45%,transparent)}
 .more{display:flex;justify-content:center;padding:18px 0}
 .empty{grid-column:1/-1;text-align:center;color:var(--mute);padding:40px 10px}
 
@@ -85,9 +86,22 @@
 .sk-h:first-child{margin-top:0}
 .art{display:grid;gap:8px}
 .art .it{grid-template-columns:minmax(0,1fr)}
-.ms-w{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
-.ms-nodes{columns:2 220px;font-size:12.5px;margin:0;padding:0;list-style:none}
-.ms-nodes li{break-inside:avoid;display:flex;justify-content:space-between;gap:8px;padding:2px 0;border-bottom:1px dashed var(--line)}
+.ms-weapon{margin-top:14px}.ms-weapon:first-child{margin-top:0}
+.ms-whead{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px}
+.ms-tier{margin-bottom:10px}
+.ms-tier-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:6px}
+.ms-tier-h.tn{background:color-mix(in srgb,#808080 18%,transparent);color:#aaa}
+.ms-tier-h.th{background:color-mix(in srgb,#f56565 18%,transparent);color:#f56565}
+.ms-tier-h.tr{background:color-mix(in srgb,#a979cb 18%,transparent);color:#c49de0}
+.ms-tier-h.thr{background:color-mix(in srgb,#f2dd92 18%,transparent);color:#e8c94a}
+.ms-grid{display:flex;flex-wrap:wrap;gap:6px}
+.ms-node{display:flex;align-items:flex-start;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;max-width:260px}
+.ms-node-wide{max-width:360px}
+.ms-ninfo{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ms-nname{font-size:12.5px;line-height:1.3}
+.ms-nlv{font-size:11px}
+.ms-ndesc{font-size:11.5px;line-height:1.4}
+.ms-empty{color:var(--mute);font-size:13.5px;margin:4px 0}
 .desc{line-height:1.6;overflow-wrap:anywhere}
 .desc img{max-width:100%;height:auto;border-radius:8px}
 .desc mark{background:color-mix(in srgb,var(--acc) 25%,transparent);color:inherit;border-radius:4px;padding:0 3px}
@@ -157,8 +171,4 @@
 .badges{align-items:flex-start}
 /* артефакты с иконками, мастерство с названиями */
 .art .it{grid-template-columns:44px minmax(0,1fr)}
-.ms-nodes li>span:first-child{display:inline-flex;align-items:center;gap:6px;min-width:0}
-.ms-common{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
-.ms-common li{font-size:13px}.ms-common p{margin:4px 0 0;color:var(--mute);line-height:1.5}
-.mc-h{display:flex;align-items:center;gap:8px}
 .giscus{min-height:120px}

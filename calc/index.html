@@ -3,9 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Конструктор билдов</title>
+<title>Конструктор билдов Throne and Liberty · T2 Билды</title>
 <meta name="description" content="Конструктор T2-билдов Throne and Liberty для всех классов: снаряжение с заточкой, трейтами и резонансом, характеристики, умения и специализации, GS и оценка DPS">
-<meta name="theme-color" content="#FFFFFF">
+<link rel="canonical" href="https://sabrox0w.beget.tech/calc/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="T2 Билды">
+<meta property="og:title" content="Конструктор билдов Throne and Liberty">
+<meta property="og:description" content="Любая связка оружия: снаряжение, характеристики, умения и специализации. Расчёт GS и DPS.">
+<meta property="og:url" content="https://sabrox0w.beget.tech/calc/">
+<meta property="og:image" content="https://sabrox0w.beget.tech/assets/og.webp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2386601A'/%3E%3Ctext x='16' y='22' font-size='14' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3ET2%3C/text%3E%3C/svg%3E">
 <script src="../assets/theme.js"></script>
 <link rel="stylesheet" href="../assets/ui.css">
@@ -16,7 +24,7 @@
 <header class="site-top"><div class="in">
   <a class="site-brand" href="../"><span class="site-logo" aria-hidden="true">T2</span><span>T2 Билды<small>Throne and Liberty</small></span></a>
   <form class="site-search" action="../builds/" method="get" role="search"><label class="sr-only" for="siteQ">Поиск билдов по названию, автору или классу</label><input id="siteQ" name="q" type="search" placeholder="Найти билд…" autocomplete="off"></form>
-  <nav class="site-nav" aria-label="Разделы сайта"><a href="../builds/">Каталог билдов</a><a href="./" aria-current="page">Конструктор</a><a href="../db/">Энциклопедия</a><a href="../">Пресеты</a></nav>
+  <nav class="site-nav" aria-label="Разделы сайта"><a href="../builds/">Каталог билдов</a><a href="./" aria-current="page">Конструктор</a><a href="../optimizer/">Оптимизатор</a><a href="../">Главная</a></nav>
   <div data-theme-switch></div>
 </div></header>
 
@@ -29,6 +37,11 @@
           <label class="sr-only" for="presetSel">Загрузить пресет</label><select id="presetSel"><option value="">Загрузить пресет…</option></select>
           <button id="newBtn" class="ghost" type="button">Очистить сборку</button>
         </div>
+      </div>
+      <div id="loadoutBar" class="loadout-bar" role="group" aria-label="Лоадауты">
+        <button class="loadout-btn active" type="button">Сборка 1</button>
+        <button class="loadout-btn" type="button">Сборка 2</button>
+        <button class="loadout-btn" type="button">Сборка 3</button>
       </div>
       <div class="combo">
         <label>Основное оружие <select id="w1Sel"></select></label>
@@ -63,8 +76,15 @@
     </div>
 
     <div class="panel">
+      <div class="panel-h"><h2>Артефакты</h2></div>
+      <p class="hint">Соларит (активное умение), Лунарит (пассивное умение), Талириты I–IV (бонусы характеристик). Сетовые бонусы считаются автоматически.</p>
+      <div id="afxSlots" class="afx-slots"></div>
+      <div id="afxSets" class="afx-sets"></div>
+    </div>
+
+    <div class="panel">
       <div class="panel-h"><h2>Мои билды</h2>
-        <div class="row-actions"><button id="saveBtn" type="button">Сохранить билд</button><button id="shareBtn" class="ghost" type="button">Скопировать ссылку</button><button id="exportBtn" class="ghost" type="button">Экспорт</button></div>
+        <div class="row-actions"><button id="saveBtn" type="button">Сохранить билд</button><button id="publishBtn" class="ghost" type="button">Опубликовать</button><button id="shareBtn" class="ghost" type="button">Скопировать ссылку</button><button id="exportBtn" class="ghost" type="button">Экспорт</button></div>
       </div>
       <div id="saved" class="saved"></div>
     </div>
@@ -83,12 +103,9 @@
         <div class="panel-h"><h2>Оценка DPS</h2><span class="pill" id="dpsVal">—</span></div>
         <div class="dps-in">
           <label>Время боя, с <input id="dTime" type="number" min="10" max="600" step="10" value="60"></label>
-          <label>Шанс крита, % <input id="dCrit" type="number" min="0" max="100" step="1" value="30"></label>
-          <label>Крит. урон без снаряжения, % <input id="dCritDmg" type="number" min="0" max="500" step="5" value="50"></label>
-          <label>Шанс мощной атаки, % <input id="dHeavy" type="number" min="0" max="100" step="1" value="15"></label>
         </div>
         <div id="dpsOut"></div>
-        <p class="hint">Упрощённая модель: умения применяются по готовности (сначала самые выгодные по урону за секунду каста), паузы заполняются автоатаками. Учитываются базовый урон оружия, перезарядка, скорость атаки, крит. урон и урон по типу оружия из снаряжения и мастерства, общие умения мастерства «Небесная кара» и «Опадающие лепестки», а шанс крита и мощной атаки — по вашим допущениям. Не учитываются защита цели, сопротивления, баффы и условные эффекты.</p>
+        <p class="hint">Упрощённая модель: умения применяются по готовности (сначала самые выгодные по урону за секунду каста), паузы заполняются автоатаками. Учитываются базовый урон оружия, перезарядка, скорость атаки, шанс крита, мощной атаки, крит. урон и урон по типу оружия из снаряжения и мастерства, общие умения мастерства «Небесная кара» и «Опадающие лепестки». Не учитываются защита цели, сопротивления, баффы и условные эффекты.</p>
       </div>
     </div>
   </aside>
@@ -113,6 +130,53 @@
   </form>
 </dialog>
 
+<dialog id="afxPicker" aria-labelledby="afxPickTitle">
+  <form method="dialog" class="dlg">
+    <div class="dlg-h"><h2 id="afxPickTitle">Выбрать артефакт</h2><button value="cancel" class="ghost x" aria-label="Закрыть">×</button></div>
+    <div class="pick-f">
+      <label class="sr-only" for="afxPickSearch">Поиск артефакта</label>
+      <input id="afxPickSearch" type="search" placeholder="Название артефакта">
+    </div>
+    <div id="afxPickList" class="pick-list"></div>
+    <div class="dlg-f"><button value="cancel" class="ghost">Отмена</button></div>
+  </form>
+</dialog>
+
+<dialog id="publishDlg" aria-labelledby="pubTitle">
+  <form method="dialog" class="dlg">
+    <div class="dlg-h"><h2 id="pubTitle">Опубликовать билд</h2><button value="cancel" class="ghost x" aria-label="Закрыть">×</button></div>
+    <div class="pub-body">
+      <label for="pubName">Название билда <span class="pub-req">*</span></label>
+      <input id="pubName" type="text" maxlength="120" placeholder="Например: «Посох + Кинжалы — PvP DPS»" autocomplete="off">
+      <label for="pubAuthor">Ваш ник</label>
+      <input id="pubAuthor" type="text" maxlength="80" placeholder="Аноним" autocomplete="nickname">
+      <label for="pubDesc">Описание (необязательно)</label>
+      <textarea id="pubDesc" rows="4" placeholder="Расскажите о билде: цель, сильные стороны, советы по игре…"></textarea>
+    </div>
+    <div class="dlg-f"><span id="pubStatus" class="pub-status"></span><button value="cancel" class="ghost">Отмена</button><button type="button" id="pubOkBtn">Опубликовать</button></div>
+  </form>
+</dialog>
+
+<dialog id="runePicker" aria-labelledby="runePickTitle">
+  <form method="dialog" class="dlg">
+    <div class="dlg-h"><h2 id="runePickTitle">Выбрать руну</h2><button value="cancel" class="ghost x" aria-label="Закрыть">×</button></div>
+    <div class="pick-f">
+      <label class="sr-only" for="runePickSearch">Поиск руны</label>
+      <input id="runePickSearch" type="search" placeholder="Название или категория">
+      <label class="sr-only" for="runePickCat">Категория</label>
+      <select id="runePickCat">
+        <option value="">Все категории</option>
+        <option value="Атака">Атака</option>
+        <option value="Защита">Защита</option>
+        <option value="Характеристики">Характеристики</option>
+        <option value="Утилита">Утилита</option>
+      </select>
+    </div>
+    <div id="runePickList" class="pick-list"></div>
+    <div class="dlg-f"><button value="cancel" class="ghost">Отмена</button></div>
+  </form>
+</dialog>
+
 <dialog id="exportDlg" aria-labelledby="exTitle">
   <form method="dialog" class="dlg">
     <div class="dlg-h"><h2 id="exTitle">Экспорт билда</h2><button value="cancel" class="ghost x" aria-label="Закрыть">×</button></div>
@@ -127,7 +191,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <footer class="site-foot">
-  Данные предметов, умений и таблицы характеристик — <a href="https://tl-build.ru" target="_blank" rel="noopener">tl-build.ru</a> и <a href="https://build.tlwg.ru" target="_blank" rel="noopener">build.tlwg.ru</a> (используются с разрешения).
   Конструктор считает снаряжение, трейты, резонанс, сеты, характеристики и GS; мастерство — в своём блоке, руны и артефакты добавляются в «Доп. бонусах». Цифры могут отличаться от игры.
 </footer>
 <script src="../assets/common.js"></script>
