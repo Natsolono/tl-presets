@@ -115,7 +115,14 @@ def calc_link(name, b):
         sk["lv"][x] = int(lv.get(x) or len(SK[x]["lv"]) or 15)
         sp = [p for p in ((b.get("spec") or {}).get(x) or []) if p in SPEC]
         if sp: sk["sp"][x] = sp
-    o = {"v": 2, "name": name[:80], "w": w, "equip": eq, "attr": {k: int(attr.get(k, 10) or 10) for k in ("Str", "Dex", "Int", "Per", "Con")}, "bonus": bonus, "sk": sk}
+    MSK = {"Sword": "SW_SH", "Sword2h": "SW2", "Dagger": "DA", "Crossbow": "CR", "Bow": "BO", "Staff": "ST", "Wand": "WA_GR", "Spear": "SP"}
+    mst = {}
+    for wk, nodes in (b.get("masteryV2") or {}).items():
+        if wk not in (MSK.get(w[0]), MSK.get(w[1])) or not nodes: continue
+        t = {i: max(1, min(int(v or 0), MS_NODES[i][1]["max"])) for i, v in nodes.items() if i in MS_NODES and int(v or 0) > 0}
+        if t: mst[wk] = t
+    msc = [x for x in (b.get("masteryCommon") or []) if x in MS_COMMON][:4]
+    o = {"v": 2, "name": name[:80], "w": w, "equip": eq, "attr": {k: int(attr.get(k, 10) or 10) for k in ("Str", "Dex", "Int", "Per", "Con")}, "bonus": bonus, "sk": sk, "ms": {"t": mst, "c": msc}}
     return base64.urlsafe_b64encode(json.dumps(o, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).decode().rstrip("=")
 
 def norm_build(b):

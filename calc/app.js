@@ -15,13 +15,21 @@ const ALL_EXPAND = ['evasion', 'critical_defense', 'critical_attack', 'accuracy'
 const WEAPON_ONLY_MAIN = new Set(['attack_power_main_hand', 'bonus_attack_power_main_hand', 'attack_speed_main_hand', 'attack_range_main_hand', 'attack_power_off_hand', 'bonus_attack_power_off_hand', 'off_hand_attack_chance']);
 const BONUS_SOURCES = ['Руна', 'Артефакт', 'Мастерство', 'Бафф', 'Прочее'];
 const GRADE_ORDER = ['Common', 'Uncommon', 'Rare', 'Rare2', 'Epic', 'Epic2', 'Legendary'];
+/* мастерство оружия: ключ дерева, ступени, тип урона оружия */
+const MS_KEY = { Sword: 'SW_SH', Sword2h: 'SW2', Dagger: 'DA', Crossbow: 'CR', Bow: 'BO', Staff: 'ST', Wand: 'WA_GR', Spear: 'SP' };
+const MS_TIER = [['Normal', 'Ступень 1'], ['High', 'Ступень 2'], ['Rare', 'Ступень 3'], ['Hero', 'Ступень 4']];
+const MS_CAP = 200, MAX_COMMON = 4;
+const WTYPE = { Sword: 'melee', Sword2h: 'melee', Dagger: 'melee', Spear: 'melee', Bow: 'range', Crossbow: 'range', Staff: 'magic', Wand: 'magic' };
+/* общие умения мастерства, которые модель DPS умеет считать */
+const MS_PROC = { WM_Common_SKILL_002: { pct: 2.4, cd: 5, hits: 7, n: 'Небесная кара' }, WM_Common_SKILL_009: { pct: 2.1, cd: 6, n: 'Опадающие лепестки' } };
 
 let ITEMS = [], byId = new Map(), SK = [], bySk = new Map(), STAT_KEYS = [];
+let MS = { weapons: {}, common: [] }, msNode = new Map(), msCommon = new Map();
 let B = blank();
 
 function blank() {
   return { v: 2, name: '', w: ['Staff', 'Dagger'], equip: {}, attr: { Str: 10, Dex: 10, Int: 10, Per: 10, Con: 10 }, bonus: [],
-    sk: { a: [], p: [], d: null, lv: {}, sp: {} }, dps: { time: 60, crit: 30, critDmg: 50, heavy: 15 } };
+    sk: { a: [], p: [], d: null, lv: {}, sp: {} }, ms: { t: {}, c: [] }, dps: { time: 60, crit: 30, critDmg: 50, heavy: 15 } };
 }
 /* старые ссылки калькулятора: {combo:'Dagger'|'Bow'} → посох + это оружие */
 function normalize(o) {
@@ -32,6 +40,9 @@ function normalize(o) {
   delete b.combo; delete b.earSet;
   b.sk = Object.assign({ a: [], p: [], d: null, lv: {}, sp: {} }, b.sk || {});
   b.dps = Object.assign(blank().dps, b.dps || {});
+  b.ms = Object.assign({ t: {}, c: [] }, b.ms || {});
+  for (const [wk, nodes] of Object.entries(b.ms.t)) { for (const id of Object.keys(nodes || {})) if (!msNode.has(id)) delete nodes[id]; if (!nodes || !Object.keys(nodes).length) delete b.ms.t[wk]; }
+  b.ms.c = (b.ms.c || []).filter(id => msCommon.has(id)).slice(0, MAX_COMMON);
   for (const k of Object.keys(b.equip)) if (!byId.has(b.equip[k].id)) delete b.equip[k];
   return b;
 }
@@ -66,6 +77,10 @@ function compute(b) {
   }
   // пассивные умения с бонусами к характеристикам
   for (const id of b.sk.p) { const sk = bySk.get(id); if (sk && sk.st) for (const x of sk.st) add(s, x.key, (x.levels || [])[(b.sk.lv[id] || 15) - 1] ?? x.value); }
+  // мастерство: статы узлов на выбранном уровне (только деревья текущих двух оружий)
+  for (const w of b.w) { const nodes = b.ms.t[MS_KEY[w]] || {}; for (const [id, lv] of Object.entries(nodes)) { const n = msNode.get(id); const L = n && n.lv && n.lv[Math.min(lv, n.lv.length) - 1]; if (L) for (const x of L.stats || []) add(s, x.stat, x.value); } }
+  if (b.ms.c.includes('WM_Common_SKILL_007')) ['str', 'dex', 'Int', 'per', 'con'].forEach(k => add(s, k, 1));
+  if (s.int) { add(s, 'Int', s.int); delete s.int; }
   // атрибуты: строка таблицы — накопленные значения; пороги добавляем только для статов, которых нет в строке
   const tot = {};
   for (const [key, , , st] of ATTRS) tot[key] = (b.attr[key] || 10) + (s[st] || 0);
@@ -115,7 +130,9 @@ function simulate(R) {
   const mn = (s.bonus_attack_power_main_hand || 0) + 1, mx = (s.attack_power_main_hand || 0) + (s.bonus_attack_power_main_hand || 0);
   if (!R.main) return { err: 'Выберите основное оружие — от него считается базовый урон.' };
   const avg = (mn + mx) / 2;
-  const mult = (1 + (d.crit / 100) * (d.critDmg / 100)) * (1 + d.heavy / 100);
+  const critDmg = d.critDmg + pct('critical_damage_dealt_modifier', s.critical_damage_dealt_modifier || 0);
+  const wt = WTYPE[B.w[0]] || 'melee'; const typeMod = pct(wt + '_damage_dealt_modifier', s[wt + '_damage_dealt_modifier'] || 0);
+  const mult = (1 + (d.crit / 100) * (critDmg / 100)) * (1 + d.heavy / 100) * (1 + typeMod / 100);
   const cdr = 1 + pct('skill_cooldown_modifier', s.skill_cooldown_modifier || 0) / 100;
   const haste = 1 + pct('attack_speed_modifier', s.attack_speed_modifier || 0) / 100;
   const swing = Math.max(0.3, pct('attack_speed_main_hand', s.attack_speed_main_hand || 1000) / haste);
@@ -128,14 +145,16 @@ function simulate(R) {
   }
   list.sort((a, b) => b.dmg / b.ct - a.dmg / a.ct);
   let t = 0, auto = 0, autoN = 0; const T = Math.max(10, Math.min(600, +d.time || 60));
+  const procs = B.ms.c.filter(id => MS_PROC[id]).map(id => Object.assign({ id, last: -1e9, cnt: 0, casts: 0, total: 0 }, MS_PROC[id]));
+  const onHit = (skill) => { for (const p of procs) { if (p.hits) { if (!skill) continue; p.cnt++; if (p.cnt < p.hits || t - p.last < p.cd) continue; p.cnt = 0; } else if (t - p.last < p.cd) continue; p.last = t; p.casts++; p.total += p.pct * avg * mult; } };
   while (t < T) {
     const r = list.find(x => x.ready <= t);
-    if (r) { r.casts++; r.total += r.dmg; r.ready = t + r.cd; t += r.ct; continue; }
+    if (r) { r.casts++; r.total += r.dmg; r.ready = t + r.cd; onHit(true); t += r.ct; continue; }
     const next = Math.min(...list.map(x => x.ready), Infinity);
-    if (next - t >= swing || !list.length) { auto += avg * mult; autoN++; t += swing; } else t = next;
+    if (next - t >= swing || !list.length) { auto += avg * mult; autoN++; onHit(false); t += swing; } else t = next;
   }
-  const total = list.reduce((a, x) => a + x.total, 0) + auto;
-  return { T, total, dps: total / T, list, auto, autoN, avg, swing, cdr, skipped: B.sk.a.filter(id => { const sk = bySk.get(id); return sk && sk.cat !== 'Basic' && !list.find(x => x.id === id); }).length };
+  const total = list.reduce((a, x) => a + x.total, 0) + auto + procs.reduce((a, p) => a + p.total, 0);
+  return { T, total, dps: total / T, list, auto, autoN, avg, swing, cdr, critDmg, typeMod, wt, procs, skipped: B.sk.a.filter(id => { const sk = bySk.get(id); return sk && sk.cat !== 'Basic' && !list.find(x => x.id === id); }).length };
 }
 
 /* ---------- отрисовка: слоты ---------- */
@@ -196,8 +215,10 @@ function renderDps(R) {
   const out = $('#dpsOut'); out.innerHTML = ''; const r = simulate(R);
   if (r.err) { out.append(el('p', 'hint', r.err)); $('#dpsVal').textContent = '—'; return; }
   $('#dpsVal').textContent = nf(Math.round(r.dps)) + ' / с';
-  out.append(kv('Урон за ' + r.T + ' с', nf(Math.round(r.total))), kv('Средний базовый урон', nf(Math.round(r.avg))), kv('Перезарядка умений', '÷ ' + r.cdr.toFixed(2)), kv('Автоатака раз в', r.swing.toFixed(2) + ' с'));
-  const rows = [...r.list.filter(x => x.casts).sort((a, b) => b.total - a.total).map(x => [x.n, x.casts, x.total]), ['Автоатаки', r.autoN, r.auto]];
+  out.append(kv('Урон за ' + r.T + ' с', nf(Math.round(r.total))), kv('Средний базовый урон', nf(Math.round(r.avg))), kv('Перезарядка умений', '÷ ' + r.cdr.toFixed(2)), kv('Автоатака раз в', r.swing.toFixed(2) + ' с'),
+    kv('Крит. урон с учётом снаряжения и мастерства', Math.round(r.critDmg * 10) / 10 + '%'));
+  if (r.typeMod) out.append(kv('Урон (' + ({ melee: 'ближний бой', range: 'дальний бой', magic: 'магия' })[r.wt] + ')', (r.typeMod > 0 ? '+' : '') + Math.round(r.typeMod * 10) / 10 + '%'));
+  const rows = [...r.list.filter(x => x.casts).sort((a, b) => b.total - a.total).map(x => [x.n, x.casts, x.total]), ...r.procs.filter(p => p.casts).map(p => [p.n + ' (мастерство)', p.casts, p.total]), ['Автоатаки', r.autoN, r.auto]];
   const tb = el('table', 'dps-t'); const th = el('tr'); ['Источник', 'Раз', 'Доля'].forEach(t => th.append(el('th', null, t))); const thead = el('thead'); thead.append(th); tb.append(thead);
   const tbody = el('tbody'); rows.forEach(([n, c, t]) => { const tr = el('tr'); tr.append(el('td', null, n), el('td', null, String(c)), el('td', null, r.total ? Math.round(t / r.total * 100) + '%' : '—')); tbody.append(tr); }); tb.append(tbody);
   out.append(tb);
@@ -261,6 +282,78 @@ function renderSkills() {
     });
     sec.append(grid); box.append(sec);
   }
+}
+
+/* ---------- мастерство ---------- */
+const msUsed = wk => Object.values(B.ms.t[wk] || {}).reduce((a, v) => a + v, 0);
+const msTag = n => (n.n.match(/^\[([^\]]+)\]/) || [])[1] || '';
+const signed = (k, v) => { const f = fmtVal(k, v); return v > 0 && f[0] !== '+' ? '+' + f : f; };
+function msStatText(n, lv) { const L = n.lv && n.lv[Math.max(1, lv) - 1]; const st = (L && L.stats) || n.st || []; return st.length ? st.map(x => `${x.label || lab(x.stat)} ${signed(x.stat, x.value)}`).join(' · ') : ''; }
+function setNode(wk, n, lv) {
+  const tree = B.ms.t[wk] = B.ms.t[wk] || {}; const cur = tree[n.id] || 0; lv = Math.max(0, Math.min(n.max, lv));
+  if (lv > cur && msUsed(wk) + (lv - cur) > MS_CAP) { toast(`В дереве не больше ${MS_CAP} очков`); return; }
+  if (lv) tree[n.id] = lv; else delete tree[n.id];
+  if (!Object.keys(tree).length) delete B.ms.t[wk];
+  update(false); renderMastery();
+}
+function renderMastery() {
+  const box = $('#mastery'); if (!box) return;
+  const open = new Set([...box.querySelectorAll('details[open]')].map(d => d.dataset.k));
+  const first = !box.childElementCount; box.innerHTML = '';
+  $('#msPts').textContent = B.w.map(w => `${W_RU[w]} ${msUsed(MS_KEY[w])}/${MS_CAP}`).join(' · ');
+  const keepOpen = (d, k, def) => { d.dataset.k = k; d.open = first ? def : open.has(k); };
+  for (const w of B.w) {
+    const wk = MS_KEY[w]; const tr = MS.weapons[wk]; if (!tr) continue;
+    const det = el('details', 'ms-tree'); keepOpen(det, wk, w === B.w[0] || !!msUsed(wk));
+    const sm = el('summary'); sm.append(icon(IC, tr.ic, '', 'sm'), el('b', null, tr.n), el('span', 'pill', `${msUsed(wk)} / ${MS_CAP}`)); det.append(sm);
+    const tools = el('div', 'row-actions ms-tools');
+    const clr = el('button', 'text', 'Сбросить дерево'); clr.type = 'button'; clr.onclick = () => { delete B.ms.t[wk]; update(false); renderMastery(); };
+    tools.append(clr); det.append(tools);
+    for (const [tier, title] of MS_TIER) {
+      const nodes = tr.nodes.filter(n => n.id.split('_')[1] === tier); if (!nodes.length) continue;
+      const sec = el('div', 'ms-tier'); sec.append(el('h3', null, title));
+      const grid = el('div', 'ms-grid');
+      nodes.slice().sort((a, b) => (a.type === 'synergy') - (b.type === 'synergy') || a.cat.localeCompare(b.cat, 'ru')).forEach(n => {
+        const lv = (B.ms.t[wk] || {})[n.id] || 0; const card = el('div', 'msn' + (lv ? ' on' : '') + (n.type === 'synergy' ? ' syn' : ''));
+        const h = el('div', 'msn-h'); h.append(icon(IC, n.ic, '', 'sm'));
+        const tt = el('div', 'msn-t'); tt.append(el('b', null, n.n.replace(/^\[[^\]]+\]\s*/, '')), el('small', null, [n.type === 'synergy' ? 'Синергия' : msTag(n), n.cat].filter(Boolean).join(' · ')));
+        h.append(tt); card.append(h);
+        if (n.type === 'synergy') {
+          const tg = el('button', 'sp-chip', lv ? 'Взято' : 'Взять'); tg.type = 'button'; tg.setAttribute('aria-pressed', !!lv); tg.setAttribute('aria-label', (lv ? 'Убрать: ' : 'Взять: ') + n.n);
+          tg.onclick = () => setNode(wk, n, lv ? 0 : 1); card.append(tg);
+          const d = el('details', 'sk-d'); d.append(el('summary', null, 'Описание'), el('p', null, n.t || '')); card.append(d);
+        } else {
+          const ctl = el('div', 'msn-ctl');
+          const minus = el('button', 'ghost', '−'); minus.type = 'button'; minus.disabled = !lv; minus.setAttribute('aria-label', 'Убавить: ' + n.n); minus.onclick = () => setNode(wk, n, lv - 1);
+          const val = el('b', null, `${lv}/${n.max}`);
+          const plus = el('button', 'ghost', '+'); plus.type = 'button'; plus.disabled = lv >= n.max; plus.setAttribute('aria-label', 'Прибавить: ' + n.n); plus.onclick = () => setNode(wk, n, lv + 1);
+          const mx = el('button', 'text', 'макс.'); mx.type = 'button'; mx.disabled = lv >= n.max; mx.setAttribute('aria-label', 'Максимум: ' + n.n); mx.onclick = () => setNode(wk, n, Math.min(n.max, lv + MS_CAP - msUsed(wk)));
+          ctl.append(minus, val, plus, mx); card.append(ctl);
+          const st = msStatText(n, lv || 1); card.append(el('p', 'msn-s', st ? (lv ? '' : 'за 1 ур.: ') + st : (n.t || '').split(/\r?\n/)[0]));
+        }
+        grid.append(card);
+      });
+      sec.append(grid); det.append(sec);
+    }
+    box.append(det);
+  }
+  const det = el('details', 'ms-tree'); keepOpen(det, 'common', !!B.ms.c.length);
+  const sm = el('summary'); sm.append(el('b', null, 'Общие умения мастерства'), el('span', 'pill', `${B.ms.c.length} / ${MAX_COMMON}`)); det.append(sm);
+  det.append(el('p', 'hint', `До ${MAX_COMMON} умений. Уровень мастерства, на котором открывается умение, указан для справки и не проверяется.`));
+  const grid = el('div', 'ms-grid');
+  MS.common.forEach(c => {
+    const on = B.ms.c.includes(c.id); const card = el('div', 'msn' + (on ? ' on' : ''));
+    const h = el('div', 'msn-h'); h.append(icon(IC, c.ic, '', 'sm')); const tt = el('div', 'msn-t'); tt.append(el('b', null, c.n), el('small', null, `открывается на ${c.req} ур.${MS_PROC[c.id] ? ' · учитывается в DPS' : c.id === 'WM_Common_SKILL_007' ? ' · учитывается в статах' : ''}`)); h.append(tt); card.append(h);
+    const tg = el('button', 'sp-chip', on ? 'Взято' : 'Взять'); tg.type = 'button'; tg.setAttribute('aria-pressed', on); tg.setAttribute('aria-label', (on ? 'Убрать: ' : 'Взять: ') + c.n);
+    tg.onclick = () => { if (on) B.ms.c = B.ms.c.filter(x => x !== c.id); else { if (B.ms.c.length >= MAX_COMMON) return toast(`Не больше ${MAX_COMMON}: сначала уберите другое`); B.ms.c.push(c.id); } update(false); renderMastery(); };
+    card.append(tg);
+    const d = el('details', 'sk-d'); d.append(el('summary', null, 'Описание'), el('p', null, c.t || '')); card.append(d);
+    grid.append(card);
+  });
+  det.append(grid); box.append(det);
+  const sum = {}; for (const w of B.w) for (const [id, lv] of Object.entries(B.ms.t[MS_KEY[w]] || {})) { const n = msNode.get(id); const L = n && n.lv && n.lv[lv - 1]; if (L) for (const x of L.stats || []) sum[x.stat] = (sum[x.stat] || 0) + x.value; }
+  const keys = Object.keys(sum).filter(k => sum[k]);
+  if (keys.length) { const t = el('details', 'all'); keepOpen(t, 'sum', false); t.append(el('summary', null, 'Что даёт мастерство')); keys.sort((a, b) => lab(a).localeCompare(lab(b), 'ru')).forEach(k => t.append(kv(lab(k), signed(k, sum[k])))); box.append(t); }
 }
 
 /* ---------- выбор и настройка предметов ---------- */
@@ -369,7 +462,7 @@ function load(o) {
   B = normalize(o);
   fillWeapons(); $('#buildName').value = B.name || '';
   ['time', 'crit', 'critDmg', 'heavy'].forEach(k => { $('#d' + k[0].toUpperCase() + k.slice(1)).value = B.dps[k]; });
-  update(); renderSkills();
+  update(); renderSkills(); renderMastery();
 }
 function fillWeapons() {
   [['#w1Sel', 0], ['#w2Sel', 1]].forEach(([sel, i]) => {
@@ -388,6 +481,8 @@ function exportText() {
   if (B.sk.a.length) { L.push(''); L.push('Активные: ' + B.sk.a.map(id => nm(id) + ((B.sk.sp[id] || []).length ? ` (${B.sk.sp[id].map(x => ((bySk.get(id).sp.find(p => p.id === x) || {}).n || x)).join(', ')})` : '')).join('; ')); }
   if (B.sk.p.length) L.push('Пассивные: ' + B.sk.p.map(nm).join('; '));
   if (B.sk.d) L.push('Защитное: ' + nm(B.sk.d));
+  const msl = B.w.map(w => [w, msUsed(MS_KEY[w])]).filter(([, v]) => v);
+  if (msl.length || B.ms.c.length) L.push('Мастерство: ' + msl.map(([w, v]) => `${W_RU[w]} ${v}`).join(', ') + (B.ms.c.length ? (msl.length ? '; ' : '') + 'общие: ' + B.ms.c.map(id => (msCommon.get(id) || {}).n || id).join(', ') : ''));
   L.push(''); L.push('Открыть в конструкторе: ' + shareUrl());
   return L.join('\n');
 }
@@ -404,8 +499,9 @@ function renderSaved() {
 
 async function init() {
   await loadMeta(DATA);
-  const [items, skills] = await Promise.all([fetch(DATA + 'items.json').then(r => r.json()), fetch(DATA + 'skills.json').then(r => r.json())]);
+  const [items, skills, ms] = await Promise.all([fetch(DATA + 'items.json').then(r => r.json()), fetch(DATA + 'skills.json').then(r => r.json()), fetch(DATA + 'mastery.json').then(r => r.json()).catch(() => null)]);
   ITEMS = items; SK = skills;
+  if (ms) { MS = ms; for (const tr of Object.values(MS.weapons)) for (const n of tr.nodes) msNode.set(n.id, n); MS.common.forEach(c => msCommon.set(c.id, c)); }
   ITEMS.forEach(it => { byId.set(it.id, it); it._gs = itemCP(it, it.mx, [], false); it._q = [it.n, it.set || '', ...Object.keys({ ...it.b, ...it.x }).map(lab), ...it.tr.map(t => lab((META.traits[t] || {}).s))].join(' ').toLowerCase(); });
   SK.forEach(s => bySk.set(s.id, s));
   STAT_KEYS = Object.keys(META.labels).filter(k => !/^(adjust_|gathering_|dash_|glide_|swim_|earn_|spend_|additional_|pv_p_|aggro_|aura_|polymorph_)/.test(k)).filter(k => !/_immune$/.test(k)).sort((a, b) => lab(a).localeCompare(lab(b), 'ru'));
@@ -413,8 +509,8 @@ async function init() {
   const presets = await fetch('presets.json').then(r => r.ok ? r.json() : []).catch(() => []);
   presets.forEach((p, i) => { const o = el('option', null, p.name); o.value = i; $('#presetSel').append(o); });
   $('#presetSel').onchange = e => { const p = presets[+e.target.value]; if (p) { load(p); toast('Пресет загружен'); } e.target.value = ''; };
-  $('#w1Sel').onchange = e => { B.w[0] = e.target.value; delete B.equip.weapon1; pruneSkills(); fillWeapons(); update(); renderSkills(); };
-  $('#w2Sel').onchange = e => { B.w[1] = e.target.value; delete B.equip.weapon2; pruneSkills(); fillWeapons(); update(); renderSkills(); };
+  $('#w1Sel').onchange = e => { B.w[0] = e.target.value; delete B.equip.weapon1; pruneSkills(); fillWeapons(); update(); renderSkills(); renderMastery(); };
+  $('#w2Sel').onchange = e => { B.w[1] = e.target.value; delete B.equip.weapon2; pruneSkills(); fillWeapons(); update(); renderSkills(); renderMastery(); };
   $('#buildName').oninput = e => { B.name = e.target.value; save(); };
   $('#newBtn').onclick = () => { if (confirm('Очистить текущую сборку?')) { load(blank()); } };
   $('#addBonus').onclick = () => { B.bonus.push({ src: 'Руна', stat: '', val: '' }); update(); };

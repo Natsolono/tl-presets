@@ -185,6 +185,18 @@ meta = {
     "runes": {"types": TB_RUNE.get("types"), "grades": TB_RUNE.get("grades"), "slots": TB_RUNE.get("slots")},
     "jsets": sorted({i["set"] for i in items if i["set"] and i["cat"] in ("Necklace", "Ring", "Bracelet", "Belt", "Earring")}),
 }
+# подписи для статов мастерства, которых нет в словаре build.tlwg.ru
+EXTRA_LAB = {"melee_damage_dealt_modifier": "Урон (ближний бой)", "range_damage_dealt_modifier": "Урон (дальний бой)", "magic_damage_dealt_modifier": "Урон (магия)"}
+for k, v in EXTRA_LAB.items():
+    meta["labels"].setdefault(k, v); meta["fmt"].setdefault(k, {"mul": 0.01, "suffix": "%", "sign": True})
+for w in mastery["weapons"].values():
+    for n in w["nodes"]:
+        for x in n.get("st") or []:
+            if x.get("label") == x.get("stat"): x["label"] = meta["labels"].get(x["stat"], x["stat"])
+        for L in n.get("lv") or []:
+            for x in L.get("stats") or []:
+                if x.get("label") == x.get("stat"): x["label"] = meta["labels"].get(x["stat"], x["stat"])
+        if n.get("t"): n["t"] = re.sub(r"\b(melee|range|magic)_damage_dealt_modifier\b", lambda m: EXTRA_LAB[m.group(0)], n["t"])
 os.makedirs(OUT, exist_ok=True)
 sz = {"items.json": W("items.json", items), "skills.json": W("skills.json", skills), "meta.json": W("meta.json", meta),
       "mastery.json": W("mastery.json", mastery), "artifacts.json": W("artifacts.json", arts)}
