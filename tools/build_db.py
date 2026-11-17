@@ -212,6 +212,7 @@ if os.path.isdir(old):
     for f in os.listdir(old):
         if not os.path.exists(os.path.join(icdir, f)): os.replace(os.path.join(old, f), os.path.join(icdir, f))
 missing = [n for n in icons if not os.path.exists(os.path.join(icdir, n))]
+if os.environ.get("ICON_MISSING_OUT"): json.dump({n: icons[n] for n in missing}, open(os.environ["ICON_MISSING_OUT"], "w", encoding="utf-8"), ensure_ascii=False)
 if "--icons" in sys.argv:
     got, fail = 0, []
     for n in missing:
